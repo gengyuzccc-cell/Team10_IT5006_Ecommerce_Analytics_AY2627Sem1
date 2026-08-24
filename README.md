@@ -202,8 +202,8 @@ classifier reporting 95% accuracy would be the majority-class rule or a leak.
   loudly rather than silently altering the report.
 - Every figure is generated into `report/figures/` as vector PDF by the
   notebooks — none is pasted in by hand.
-- `python src/report_stats.py` recomputes all 160 numeric claims in the report.
-- All 15 bibliography entries were verified against publisher records (DOI,
+- `python src/report_stats.py` recomputes all 170 numeric claims in the report.
+- All 20 bibliography entries were verified against publisher records (DOI,
   volume, issue, pages) rather than quoted from memory.
 
 ### Deploying
