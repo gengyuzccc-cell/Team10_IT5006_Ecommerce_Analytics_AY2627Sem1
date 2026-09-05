@@ -1,0 +1,136 @@
+\section{Literature Review}
+
+\subsection{Scope}
+
+This project analyses the \emph{Olist Brazilian E-Commerce} dataset: nine
+relational tables covering 99{,}441 orders placed on a Brazilian marketplace
+between September 2016 and October 2018 \citep{olist2018dataset}. Olist aggregates
+small sellers onto Brazil's large retail platforms and handles fulfilment, so each
+order links a customer, one or more sellers, a basket, a payment, a delivery and
+usually a review -- a structure supporting all three question families the brief
+identifies: operational performance, customer experience and commercial outcomes.
+The review below covers what Phase 2 depends on: fulfilment and satisfaction,
+model families for tabular data, feature engineering on a relational order model,
+and metrics that survive severe imbalance.
+
+\subsection{Fulfilment, delivery promises and customer satisfaction}
+
+The e-commerce service-quality literature is unusually direct about which lever
+matters. \citet{parasuraman2005esqual} decompose electronic service quality into
+efficiency, \emph{fulfilment}, system availability and privacy, and find
+fulfilment -- the accuracy of delivery promises and the condition in which goods
+arrive -- among the strongest contributors to perceived quality.
+\citet{rao2011elsq} sharpen this into logistics terms across 260 online retailers.
+Transactional evidence at platform scale now confirms it: across more than 15
+million marketplace orders, \citet{deshpande2023logistics} trace a chain rather
+than a single link -- logistics performance drives the service rating a customer
+leaves, and that rating in turn moves seller sales. That chain makes a low-review
+model a commercial instrument rather than a diagnostic.
+
+The promise itself is a second, less obvious decision variable.
+\citet{cui2024promise} show that committing to a faster delivery date raises sales
+but also increases returns and depresses retention, so the optimal promise trades
+demand against the cost of breaking it. An estimated delivery date is therefore a
+business decision, not a forecast, and should not be expected to behave like one
+(Section~\ref{sec:candidates}). Prediction likewise pays only when it feeds a
+decision: \citet{kandula2021prescriptive} route machine-learned delivery outcomes
+into a scheduling optimiser and report cost savings of up to 10.2\%.
+
+Delivery is thus the dominant \emph{observable} input to how a customer rates a
+transaction, which is why our second candidate problem is framed after delivery
+rather than at checkout. The same literature warns what is \emph{not} observable
+here -- product expectations, seller communication, returns handling -- none of
+which appears in an order table, and any performance ceiling we report must be
+read against that omission.
+
+\subsection{Model families for tabular transactional data}
+
+For structured data of this size the practical model space is well characterised.
+Regularised linear and logistic models are the natural baseline: cheap,
+interpretable, and -- as Section~\ref{sec:candidates} shows -- revealing about
+distribution shift. Tree ensembles are the usual step up, whether by bagging
+decorrelated trees \citep{breiman2001rf} or fitting residuals stagewise with
+shrinkage \citep{friedman2001gbm, chen2016xgboost}. \citet{grinsztajn2022tabular}
+benchmark both against modern deep architectures across 45 datasets and find
+tree-based methods remain state of the art at this scale, the gap owing to
+inductive biases better matched to irregular tabular targets.
+
+We therefore adopt a small model budget: one linear family (ridge and
+$\ell_2$-regularised logistic regression) and one tree ensemble (histogram-based
+gradient boosting), reused across both framings. Section~\ref{sec:candidates}
+justifies that complexity in both directions -- the ensemble earns its place on
+lead time, while on repeat purchase neither family beats the baseline.
+
+\subsection{Feature engineering on a relational order model}
+
+Deriving features from nine tables raises a problem a flat file does not. Three of
+them -- items, payments and reviews -- are one-to-many against orders, so a naive
+join multiplies rows and reweights every aggregate towards multi-item orders. The
+remedy is to aggregate each child relation to the analysis grain before joining.
+Beyond that the usual transactional vocabulary applies: basket counts and sums,
+ratios that normalise for order size, calendar encodings, and geographic distance
+from postcode centroids. High-cardinality categoricals such as the 74 product
+categories suit target encoding \citep{miccibarreca2001target} better than
+one-hot, provided it is fitted inside the cross-validation loop.
+
+Leakage is the dominant risk. \citet{kaufman2012leakage} formalise it as
+information about the target unavailable at prediction time, and identify the two
+forms that threaten this dataset: post-outcome features and improper partitioning.
+\citet{kapoor2023leakage} show how routinely both survive peer review, cataloguing
+eight types of leakage across 294 affected papers in 17 fields; ours are their
+\emph{illegitimate feature} and \emph{no clean separation between training and
+test data} categories, and we guard each with an explicit assertion rather than a
+convention. Critically, this framing makes leakage relative to a \emph{prediction
+moment} -- the principle our feature policy is built on, since delivery outcomes
+are forbidden when forecasting delivery but admissible when predicting a review
+not yet written. On partitioning, \citet{bergmeir2012cv} show that standard
+$k$-fold cross-validation is invalid for temporally ordered data.
+
+\subsection{Evaluation under imbalance and drift}
+
+Both classification targets here are heavily imbalanced, and the brief is explicit
+that accuracy alone misleads. \citet{saito2015prplot} show that precision--recall
+curves are more informative than ROC curves under strong imbalance, because
+ROC-AUC is insensitive to a large true-negative mass. We report PR-AUC against its
+no-skill floor alongside balanced accuracy, treating raw accuracy as a diagnostic
+rather than a headline.
+
+The obvious next step -- correcting the imbalance -- is one we deliberately do not
+take. \citet{goorbergh2022imbalance} test random under-sampling, over-sampling and
+SMOTE \citep{chawla2002smote} and find none improves discrimination, while all
+three badly miscalibrate the resulting probabilities, systematically
+overestimating minority-class risk; they recommend adjusting the decision
+threshold on uncorrected data instead. We therefore do not resample. We do weight
+the loss by class, which serves the same end as their threshold shift, but it
+carries the same caveat: we treat model outputs as \emph{decision scores rather
+than calibrated risks}. Should Phase 2 need calibrated risk -- to rank at-risk
+orders by expected cost -- we will fit on the observed prior and tune the
+threshold, reporting calibration explicitly.
+
+Regression brings a second complication. \citet{hyndman2006accuracy} argue for
+judging errors against a naive benchmark, decisive here because delivery
+performance improves dramatically across the window (Section~\ref{sec:temporal}).
+Under such a level shift, $R^2$ against a baseline fitted on the past turns
+negative even for a useful model, whereas mean absolute error stays interpretable.
+This is textbook concept drift \citep{gama2014drift}, whose recommendation that
+non-stationary models be refitted with respect to time shapes our Phase 2 plan.
+All modelling uses \code{scikit-learn} pipelines \citep{pedregosa2011sklearn},
+keeping preprocessing inside each fold.
+
+\subsection{Conclusion: trends, gaps and opportunities}
+
+Three themes emerge. The service-quality literature converges on \emph{fulfilment}
+as the dominant observable driver of e-commerce satisfaction, and now traces it
+through to seller revenue. The tabular machine-learning literature converges on a
+small set of model families, with tree ensembles the reasonable ceiling at this
+scale. And the methodological literature is emphatic -- increasingly so -- that on
+imbalanced, temporally ordered data the choice of split, metric and imbalance
+handling decides whether a number means anything at all.
+
+The gap we address is narrow but concrete. Most work on this marketplace is
+descriptive, or predicts review scores from features that would not exist when the
+prediction is needed. Little of it is explicit about \emph{when} a model would run
+-- a choice that changes both what is admissible and what is achievable, by a
+factor of two in our own results. Making the prediction moment a first-class
+design decision, and measuring its cost, is the contribution of
+Section~\ref{sec:candidates}.

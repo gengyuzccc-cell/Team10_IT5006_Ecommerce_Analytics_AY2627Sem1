@@ -1,9 +1,18 @@
 # Runtime dependencies for the deployed Streamlit dashboard.
 #
 # Deliberately minimal: this is the file Streamlit Community Cloud installs, and
-# every package here is one that dashboard/app.py actually imports. The analysis
-# stack (scikit-learn, matplotlib, Jupyter) lives in requirements-dev.txt so the
-# deployment neither waits for it nor fails on it.
+# every package here is one the app actually imports.
+#
+# PHASE 2 ADDS scikit-learn. The dashboard no longer only draws charts - the
+# Predict tab unpickles models/*.joblib and scores orders, so the library that
+# wrote those pickles has to be present at runtime. It is pinned to the EXACT
+# version they were trained on: scikit-learn makes no cross-version pickle
+# guarantee, and a model that loads but behaves subtly differently is worse than
+# one that refuses to load. src/modeling.load_model() checks the version and the
+# app surfaces a warning if it ever drifts.
+#
+# matplotlib and Jupyter stay in requirements-dev.txt: they are needed to
+# regenerate the report figures, never to serve a page.
 #
 #     pip install -r requirements-dev.txt      # everything, for the notebooks
 #     pip install -r requirements.txt          # just the dashboard
@@ -33,4 +42,15 @@ numpy>=2.3.2,<3        ; python_version >= "3.13"
 
 plotly==5.24.1         ; python_version < "3.13"
 plotly>=5.24.1,<7      ; python_version >= "3.13"
+
+# Phase 2: model serving. scipy and joblib arrive as scikit-learn dependencies
+# but are pinned explicitly because both affect the numerics behind every metric
+# quoted in the report.
+scikit-learn==1.5.2        ; python_version < "3.13"
+scikit-learn>=1.7.2,<2     ; python_version >= "3.13"
+
+scipy==1.14.1              ; python_version < "3.13"
+scipy>=1.16.2,<2           ; python_version >= "3.13"
+
+joblib>=1.4,<2
 

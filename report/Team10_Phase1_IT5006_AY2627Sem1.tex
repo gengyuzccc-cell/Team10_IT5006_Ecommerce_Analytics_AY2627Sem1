@@ -1,0 +1,397 @@
+% ---------------------------------------------------------------------------
+% IT5006 Fundamentals of Data Analytics
+% Group Project Milestone 1: Literature Review and Exploratory Data Analysis
+%
+% Compiles with pdfLaTeX. Build: pdflatex -> bibtex -> pdflatex x2
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{lmodern}      % scalable Type 1 font; required for microtype expansion
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{figures/}}
+\captionsetup{font=small,labelfont=bf,skip=5pt}
+\setlength{\parskip}{0.18em}
+\setlength{\textfloatsep}{10pt plus 2pt minus 2pt}
+\setlength{\intextsep}{10pt plus 2pt minus 2pt}
+\bibliographystyle{plainnat}
+
+% Footnotes lettered, with a visible rule, so the notes read as marginal
+% commentary rather than as numbered citations.
+\renewcommand{\thefootnote}{\alph{footnote}}
+\renewcommand{\footnoterule}{\vspace*{4pt}\hrule width 0.45\columnwidth height 0.4pt\vspace*{4pt}}
+\makeatletter
+\renewcommand\@makefntext[1]{\parindent 1em\noindent\hb@xt@1.4em{\hss\@makefnmark}\footnotesize #1}
+\makeatother
+
+% Citation marks a little smaller than body text.
+\let\oldcitep\citep
+\renewcommand{\citep}[1]{{\footnotesize\oldcitep{#1}}}
+\let\oldcitet\citet
+\renewcommand{\citet}[1]{{\footnotesize\oldcitet{#1}}}
+
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+% ---------------------------------------------------------------------------
+\begin{document}
+
+% ============================== COVER PAGE =================================
+\begin{titlepage}
+\centering
+\vspace*{3.5cm}
+
+{\Large\bfseries Group Project Milestone 1:\par}
+\vspace{0.6em}
+{\Large\bfseries Literature Review and Exploratory Data Analysis\par}
+
+\vspace{1.2cm}
+{\large Predicting Delivery Performance and Customer Satisfaction\par}
+\vspace{0.4em}
+{\normalsize An analysis of 99{,}441 orders from the Olist Brazilian e-commerce marketplace\par}
+
+\vspace{3.5cm}
+
+{\large\bfseries Group 10\par}
+\vspace{0.9em}
+
+{\normalsize
+\begin{tabular}{@{}l@{\hspace{1.5em}}l@{}}
+Pan Pinyou  & A0329105L \\[3pt]
+Li Yudan    & A0330335R \\[3pt]
+Zhu Gengyu  & A0333773Y \\
+\end{tabular}\par}
+
+\vfill
+
+{\large National University of Singapore\par}
+\vspace{0.4em}
+{\large IT5006 Fundamentals of Data Analytics\par}
+\vspace{0.4em}
+{\large AY2026/2027 Semester 1\par}
+
+\vspace{1.1cm}
+{\normalsize
+\textbf{Dashboard:} \url{https://it5006-group-project-10.streamlit.app}\\[4pt]
+\textbf{Repository:} \url{https://github.com/gengyuzhu/IT5006-Group-Project-10}\par}
+
+\vspace{1.2cm}
+\end{titlepage}
+
+% ============================== BODY =======================================
+\input{sections/01_litreview}
+\input{sections/02_eda}
+
+% ============================== REFERENCES =================================
+\newpage
+\bibliography{refs}
+
+% ============================== APPENDIX ===================================
+\newpage
+\appendix
+
+\section{Data Model, Audit and Dictionary}
+\label{app:dictionary}
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  font=\small,
+  box/.style={draw, rounded corners=2pt, minimum height=9mm, minimum width=25mm,
+              inner xsep=4pt, inner ysep=3pt, align=center},
+  spine/.style={box, very thick},
+  link/.style={draw, -{Latex[length=4pt]}, thin},
+  lbl/.style={font=\scriptsize, midway, fill=white, inner sep=1pt}
+]
+\node[spine] (ord) at (0,0) {\textbf{ORDERS}\\[-2pt]\scriptsize 99{,}441\\[-2pt]\scriptsize \textit{one row = one order}};
+
+\node[box] (cus) at (-4.3,1.5) {\textbf{CUSTOMERS}\\[-2pt]\scriptsize 99{,}441};
+\node[box] (itm) at (4.3,1.5) {\textbf{ORDER\_ITEMS}\\[-2pt]\scriptsize 112{,}650};
+\node[box] (pay) at (4.3,0) {\textbf{ORDER\_PAYMENTS}\\[-2pt]\scriptsize 103{,}886};
+\node[box] (rev) at (4.3,-1.5) {\textbf{ORDER\_REVIEWS}\\[-2pt]\scriptsize 99{,}224};
+
+\node[box] (prd) at (8.6,2.2) {\textbf{PRODUCTS}\\[-2pt]\scriptsize 32{,}951};
+\node[box] (sel) at (8.6,0.8) {\textbf{SELLERS}\\[-2pt]\scriptsize 3{,}095};
+\node[box] (cat) at (12.4,2.2) {\textbf{CATEGORY}\\[-2pt]\scriptsize \textbf{TRANSLATION} 71};
+\node[box] (geo) at (-4.3,-1.0) {\textbf{GEOLOCATION}\\[-2pt]\scriptsize 1{,}000{,}163};
+
+\draw[link] (cus) -- node[lbl]{1\,:\,1} (ord);
+\draw[link] (ord) -- node[lbl]{1\,:\,N} (itm);
+\draw[link] (ord) -- node[lbl]{1\,:\,N} (pay);
+\draw[link] (ord) -- node[lbl]{1\,:\,N} (rev);
+\draw[link] (itm) -- node[lbl]{N\,:\,1} (prd);
+\draw[link] (itm) -- node[lbl]{N\,:\,1} (sel);
+\draw[link] (prd) -- node[lbl]{N\,:\,1} (cat);
+\draw[link] (geo) -- node[lbl,align=center]{zip\\prefix} (cus);
+\end{tikzpicture}}
+\caption{The nine source tables. \code{ORDERS} is the analysis grain. The three
+one-to-many children (bold arrows to items, payments and reviews) are each
+aggregated to one row per order \emph{before} joining; merging them directly
+inflates the table by 19\% and biases every average.}
+\label{fig:datamodel}
+\end{figure}
+
+\begin{table}[htbp]
+\centering
+\caption{Data quality audit and cleaning decisions, implemented as
+\code{CLEANING\_DECISIONS} in the data-loading module.}
+\label{tab:quality}
+\small
+\begin{tabular}{@{}p{2.7cm}p{4.7cm}p{6.3cm}@{}}
+\toprule
+\textbf{Issue} & \textbf{Evidence} & \textbf{Decision} \\
+\midrule
+One-to-many joins &
+112{,}650 items and 103{,}886 payments against 99{,}441 orders; a naive merge
+yields 118{,}437 rows &
+Aggregate each child table to one row per order, then join; assert the grain \\[3pt]
+
+Customer key &
+99{,}441 \code{customer\_id} values but 96{,}096 \code{customer\_unique\_id};
+2{,}997 people ordered more than once &
+Carry \code{customer\_unique\_id} and group on it for repeat behaviour and for
+splitting \\[3pt]
+
+Undelivered orders &
+2.98\% of orders have no delivery timestamp; status is \emph{delivered} for
+97.0\% &
+Delivery targets computed only for delivered orders; the rest are \code{NaN},
+never imputed \\[3pt]
+
+Review keys &
+\code{review\_id} is not unique (789 ids reused); 547 orders carry 2--3 reviews
+and 768 carry none &
+Key on \code{order\_id}, keep the earliest review; no review means \code{NaN} \\[3pt]
+
+Sparse review text &
+\code{review\_comment\_title} present for 11.7\% of reviews,
+\code{review\_comment\_message} for 41.3\% &
+Use \code{review\_score} only; coverage does not support NLP features \\[3pt]
+
+Geolocation grain &
+1{,}000{,}163 rows for 19{,}010 zip prefixes, including points outside Brazil &
+Collapse to a median coordinate per prefix; use it for great-circle distance \\[3pt]
+
+Missing product attributes &
+610 products (1.9\%) have no category &
+Label \code{unknown} rather than dropping orders; impute numerics in-pipeline \\[3pt]
+
+Coverage ramp &
+326 orders before 2017; final weeks truncated mid-cycle &
+Restrict to 2017-01-01 .. 2018-08-31 (99{,}091 orders) \\[3pt]
+
+Portuguese categories &
+71 category names &
+Translate to English for all output; keep the original key \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Candidate problems against the brief's scoping checklist.}
+\label{tab:checklist}
+\small
+\begin{tabular}{@{}p{2.5cm}p{4.1cm}p{3.6cm}p{3.5cm}@{}}
+\toprule
+\textbf{Criterion} & \textbf{C1 delivery (checkout)} & \textbf{C2 low review (delivery)} & \textbf{C3 repeat (checkout)} \\
+\midrule
+Derivable target & Yes, from order timestamps & Yes, \code{review\_score} $\le 2$ & Yes, next order by person \\
+No leakage & Yes, checkout regime & Yes, at-delivery regime & Yes, checkout regime \\
+Sufficient signal & Regression yes ($-41\%$ MAE); classification weak (1.6$\times$) & Yes, PR-AUC 0.40 vs 0.11 (3.6$\times$) & No, 2.0$\times$ at a 1.7\% base rate \\
+Manageable imbalance & 8.1\% late; loss weights and PR-AUC, no resampling & 14.6\% low; same handling & 2.6\%, too extreme \\
+Clear stakeholder & Operations & Customer experience & CRM \\
+\midrule
+\textbf{Verdict} & \textbf{Primary} & \textbf{Secondary} & Rejected \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Data dictionary for the nine source tables, in the column-level format
+used by the NIBRS reference dictionary supplied with the brief. \emph{Nullable}
+is measured, not declared: Y means the column actually contains missing values
+in this extract, with the observed rate given.}
+\label{tab:dictionary}
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+% \code forces \small, which is larger than the \scriptsize of this table and
+% makes the identifier columns collide. Inside the table, follow the ambient size.
+\renewcommand{\code}[1]{\texttt{#1}}
+\begin{tabular}{@{}p{2.05cm}p{4.5cm}p{1.15cm}p{1.05cm}p{5.75cm}@{}}
+\toprule
+\textbf{Table} & \textbf{Column} & \textbf{Type} & \textbf{Null} & \textbf{Comment} \\
+\midrule
+\code{orders} & \code{order\_id} & text & N & Primary key. The analysis grain \\
+ & \code{customer\_id} & text & N & \textbf{Per-order} key, not a person \\
+ & \code{order\_status} & text & N & 8 values; \emph{delivered} for 97.0\% \\
+ & \code{order\_purchase\_timestamp} & datetime & N & The checkout prediction moment \\
+ & \code{order\_approved\_at} & datetime & Y 0.16\% & Post-checkout; excluded as a feature \\
+ & \code{order\_delivered\_carrier\_date} & datetime & Y 1.79\% & Post-outcome \\
+ & \code{order\_delivered\_customer\_date} & datetime & Y 2.98\% & Post-outcome; defines both delivery targets \\
+ & \code{order\_estimated\_delivery\_date} & date & N & Promised at checkout; \textbf{admissible}. Date only, 459 distinct values \\
+\midrule
+\code{order\_items} & \code{order\_id} & text & N & \textbf{1:N} --- 112,650 rows for 98,666 orders \\
+ & \code{order\_item\_id} & int & N & Sequence within the order, 1--21 \\
+ & \code{product\_id}, \code{seller\_id} & text & N & Foreign keys \\
+ & \code{shipping\_limit\_date} & datetime & N & Post-checkout; excluded \\
+ & \code{price}, \code{freight\_value} & float & N & Per item; summed to order level \\
+\midrule
+\code{order\_payments} & \code{order\_id} & text & N & \textbf{1:N}. One order has no payment row \\
+ & \code{payment\_sequential} & int & N & 1--29 \\
+ & \code{payment\_type} & text & N & 5 values; credit card 75.4\% \\
+ & \code{payment\_installments} & int & N & 0--24; $>1$ for 51.4\% of orders \\
+ & \code{payment\_value} & float & N & Summed to order level \\
+\midrule
+\code{order\_reviews} & \code{review\_id} & text & N & \textbf{Not unique} --- 789 ids reused across orders \\
+ & \code{order\_id} & text & N & \textbf{1:N}; 547 orders carry 2--3 reviews \\
+ & \code{review\_score} & int & N & 1--5; target of Candidate 2 \\
+ & \code{review\_comment\_title} & text & Y 88.3\% & Too sparse to use \\
+ & \code{review\_comment\_message} & text & Y 58.7\% & Too sparse to use; no NLP features \\
+ & \code{review\_creation\_date} & date & N & Post-outcome for the review target \\
+ & \code{review\_answer\_timestamp} & datetime & N & Post-outcome \\
+\midrule
+\code{customers} & \code{customer\_id} & text & N & Joins 1:1 to orders \\
+ & \code{customer\_unique\_id} & text & N & \textbf{The actual person}; 96,096 of them. Grouping key for splits \\
+ & \code{customer\_zip\_code\_prefix} & int & N & Joins to geolocation \\
+ & \code{customer\_city}, \code{customer\_state} & text & N & 4,119 cities, 27 states \\
+\midrule
+\code{sellers} & \code{seller\_id} & text & N & 3,095 sellers \\
+ & \code{seller\_zip\_code\_prefix} & int & N & Joins to geolocation \\
+ & \code{seller\_city}, \code{seller\_state} & text & N & 59.7\% of sellers are in SP \\
+\midrule
+\code{products} & \code{product\_id} & text & N & 32,951 products \\
+ & \code{product\_category\_name} & text & Y 1.85\% & Portuguese; 73 values. Nulls labelled \emph{unknown} \\
+ & \code{product\_weight\_g} & float & Y 0.01\% & Summed to order level \\
+ & \code{product\_length/height/width\_cm} & float & Y 0.01\% & Combined into item volume \\
+ & \code{product\_photos\_qty} & float & Y 1.85\% & Listing-quality proxy \\
+\midrule
+\code{geolocation} & \code{geolocation\_zip\_code\_prefix} & int & N & 19,015 prefixes over 1,000,163 rows \\
+ & \code{geolocation\_lat}, \code{\_lng} & float & N & Collapsed to a median per prefix; out-of-Brazil points dropped \\
+\midrule
+\code{category\_} & \code{product\_category\_name} & text & N & Join key \\
+\code{translation} & \code{product\_category\_name\_english} & text & N & 71 translations \\
+\midrule
+\multicolumn{5}{@{}l@{}}{\textit{Derived in \code{src/} --- not present in any source file:}} \\
+derived & \code{delivery\_days} & float & Y & Purchase to arrival; target of C1A \\
+derived & \code{is\_late} & bool & Y & Arrival after the promised date; target of C1B \\
+derived & \code{distance\_km} & float & Y 1.2\% & Great-circle customer--seller distance \\
+derived & \code{estimated\_days} & float & N & Promised window in days \\
+derived & \code{lead\_category} & text & N & Category of the most expensive item \\
+derived & \code{freight\_ratio} & float & Y & Freight as a share of item value \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\newpage
+\section{Figures}
+\label{app:figures}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{fig01_coverage_quality.pdf}
+  \caption{(a) Monthly order volume. The pilot period before 2017 contributes 326
+  orders in total and is excluded from the analysis window. (b) Missingness by
+  column: structural rather than random, dominated by orders that never reached
+  the customer.}
+  \label{fig:coverage}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{fig02_volume_drift.pdf}
+  \caption{(a) Order volume with the Black Friday 2017 spike. (b) The central
+  temporal finding: mean delivery lead time halves across the window (line, left
+  axis) while the late rate is volatile rather than trending (bars, right axis),
+  spiking at Black Friday and during the May 2018 truckers' strike.}
+  \label{fig:volume}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{fig03_rhythm.pdf}
+  \caption{Purchase rhythm and the lead-time distribution. Ordering is
+  weekday-heavy and peaks at 16:00; lead time is right-skewed with a median of
+  10.2 days and a long tail.}
+  \label{fig:rhythm}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{fig04_geography.pdf}
+  \caption{(a) Sellers are far more concentrated in S\~{a}o Paulo than customers
+  are, so most orders must cross the country. (b) Customer--seller distance.
+  (c) That distance shows up directly in regional delivery times.}
+  \label{fig:geography}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{fig05_products_money.pdf}
+  \caption{(a) Demand is long-tailed across 74 categories. (b) Order value is
+  strongly right-skewed. (c) Credit card dominates, usually in instalments.}
+  \label{fig:products}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{fig06_reviews_delivery.pdf}
+  \caption{(a) Reviews are severely imbalanced towards five stars. (b) The
+  strongest relationship in the dataset: the 1--2 star rate rises monotonically
+  with lateness, from 9.2\% for on-time orders to 54.0\% for late ones.}
+  \label{fig:reviews}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.62\linewidth]{fig07_correlations.pdf}
+  \caption{Correlations among order-level quantities. Distance and the platform's
+  own promise are the strongest checkout-time correlates of lead time.}
+  \label{fig:correlations}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.58\linewidth]{fig08_leakage.pdf}
+  \caption{What one forbidden column is worth. Adding the realised delivery time
+  to the late-delivery model takes ROC-AUC from 0.589 to 1.000 --- the model is
+  reading the answer, not predicting it.}
+  \label{fig:leakage}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{fig09_candidates.pdf}
+  \caption{Candidate comparison. (a) PR-AUC against the no-skill floor for each
+  candidate and prediction moment. (b) Lead-time MAE: the platform's own promise
+  is worse than a constant. (c) Raw accuracy flatters every imbalanced target;
+  balanced accuracy does not.}
+  \label{fig:candidates}
+\end{figure}
+
+% ============================== AI DECLARATION =============================
+\clearpage
+\section*{AI Tool Declaration}
+\addcontentsline{toc}{section}{AI Tool Declaration}
+
+We used OpenAI's ChatGPT and Anthropic's Claude to generate and validate ideas,
+improve expression and refine our writing. We also used the models to debug our
+code. All analytical decisions, results and conclusions were reviewed and
+verified by the team against the underlying data, and we are responsible for the
+content and quality of the submitted work.
+
+\end{document}

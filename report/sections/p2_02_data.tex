@@ -1,0 +1,103 @@
+\section{Data Preparation and Feature Engineering}
+\label{sec:data}
+
+\subsection{From nine tables to one row per order, split three ways}
+
+The preparation pipeline is inherited unchanged from Phase 1
+(\code{src/data\_load.py}). Three of the nine source tables --- items, payments
+and reviews --- are one-to-many against orders, so each is aggregated to the
+order grain \emph{before} joining; a direct merge yields 118{,}437 rows rather
+than 99{,}441 and silently reweights every mean towards large baskets. The grain
+is asserted after the join, and \code{customer\_unique\_id} is carried throughout
+because \code{customer\_id} is regenerated per order and is not a person.
+Restricting to the fully-operational window leaves \textbf{99{,}091} orders.
+Eleven cleaning decisions with their evidence are recorded as
+\code{CLEANING\_DECISIONS} in the loader and tabulated in the Phase 1 appendix;
+\code{src/report\_stats.py} still reproduces every Phase 1 number byte-for-byte
+after the Phase 2 additions, which \code{tests/test\_leakage.py} asserts.
+
+Each period has exactly one job. \textbf{Train} (2017-01-01\,--\,2018-04-30,
+73{,}008 orders) fits every model, with expanding-window cross-validation inside
+it tuning hyperparameters. \textbf{Validation} (2018-05-01\,--\,2018-06-30,
+13{,}156) sets every decision threshold and fits the margin-to-risk calibration.
+\textbf{Test} (2018-07-01\,--\,2018-08-31, 12{,}927) is scored once, at the end,
+for models already chosen. The split is chronological rather than
+stratified-random because the target drifts, and additionally disjoint on the
+customer: 2{,}997 people ordered more than once, so a purely temporal cut can
+still put one of a person's orders on each side, and the \textbf{227} straddling
+buyers are removed from a clean test subset used in
+Section~\ref{sec:results-review}.
+
+\subsection{Features, and the moment each becomes knowable}
+
+Phase 1's 25 features carry forward unchanged: 6 calendar (month, weekday, hour,
+weekend, business hours, the Black Friday window), 11 basket-and-money
+(\code{log\_price}, \code{freight\_ratio}, \code{log\_weight}, volume, item and
+seller counts, instalments), 4 geographic (\code{log\_distance},
+\code{same\_state}, customer state, seller region), 2 for the promise and 2
+catalogue. The design carries no exact duplicates --- Phase 1's first draft held
+\code{total\_price} alongside \code{log\_price} and \code{total\_payment}, which
+makes a linear baseline meaningless --- and \code{purchase\_year} is absent
+because the split is chronological, so a linear term on it would extrapolate into
+an unseen year. Phase 2 adds \textbf{eight track-record features}, taking the
+checkout set to 33 and the at-delivery set to 36: a seller's mean lead time, late
+rate, low-review rate and order count; a route's mean lead time; a category's
+low-review rate; and the platform's own lead time and late rate. The at-delivery
+regime additionally sees three columns describing how delivery actually went.
+
+\subsection{Track records, and the trap inside them}
+\label{sec:history}
+
+A seller's history is the strongest thing a marketplace knows about an order at
+checkout, and the easiest place here to leak, because of a distinction that is
+easy to miss: \emph{past} means the earlier order had \textbf{closed} before this
+one was placed --- not merely that it was placed earlier. A parcel bought last
+week that has not yet arrived has no lead time yet, so ordering the history by
+\emph{purchase} time would let every order average in outcomes that had not
+happened. That is Kaufman et al.'s \emph{illegitimate feature}
+\citep{kaufman2012leakage} in a convincing disguise, and it would be invisible in
+the metrics because it would simply look like a better model. Every aggregate is
+therefore an as-of join against the moment the earlier outcome became observable
+--- \code{order\_delivered\_customer\_date} for delivery,
+\code{review\_creation\_date} for reviews --- with a strict boundary.
+
+Two further guards. A mean over one previous order is noise rather than a rate,
+so below a floor of five prior orders the value is undefined and a fallback chain
+takes over (seller $\rightarrow$ route $\rightarrow$ seller state $\rightarrow$
+platform), after which 0.95\% of orders lack any history value. And cold start is
+information rather than error: \code{hist\_seller\_n} carries how many past
+orders the estimate rests on, so a model can discount a seller it has barely
+seen. The platform features additionally use a \textbf{28-day trailing window}
+rather than an expanding mean --- lead time halves across the analysis window, so
+an average over all history reports roughly 13 days while the current month runs
+at 8 --- and their range, 5.2 to 17.1 days, is a direct measure of the drift the
+models must survive.
+
+Because a leak here would be invisible in the metrics, the construction is
+checked rather than reviewed: \code{tests/test\_leakage.py} rebuilds
+\code{hist\_seller\_lead\_days} from first principles for 200 random orders and
+requires exact agreement, and a second check confirms the platform tracker
+\emph{lags} rather than anticipates (Appendix~\ref{app:repro}).
+
+\subsection{Leakage: one rule per prediction moment}
+
+Leakage here is not one rule but one per \emph{prediction moment}, because what
+is known depends on when the model runs. \emph{At checkout} nothing about
+fulfilment or the customer's opinion exists, so delivery dates and everything
+derived from them, the review score and its timestamps,
+\code{order\_approved\_at}, \code{shipping\_limit\_date} and
+\code{order\_status} are forbidden. \emph{At delivery} only the review and its
+timestamps remain forbidden --- the delivery outcome is now history, and the
+brief itself lists ``delivery performance'' among the features for that problem.
+\code{assert\_no\_leakage(features, regime)} enforces the correct set before any
+model is fitted, is tested in both directions, and raises on an unrecognised
+regime name, because passing the wrong regime is itself the mistake it exists to
+catch.
+
+\code{order\_estimated\_delivery\_date} is admissible at checkout and matters:
+the customer is shown that promise when the order is placed, so it precedes the
+outcome and encodes whatever Olist's own routing knew. It is a useful feature and
+--- Section~\ref{sec:results-reg} --- a poor prediction. The cost of getting the
+regime wrong is measurable: adding one forbidden column, the realised delivery
+time, lifts the late-delivery model's ROC-AUC from 0.589 to \textbf{1.000}. That
+is not a result; it is the target restated.

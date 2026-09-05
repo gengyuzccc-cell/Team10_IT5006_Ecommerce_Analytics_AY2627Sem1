@@ -278,11 +278,14 @@ def _items_per_order(items: pd.DataFrame, products: pd.DataFrame,
     )
 
     # Attributes of the most expensive item: the one that characterises the order.
+    # seller_id is carried through for the Phase 2 expanding-window history
+    # features (src/features.py); nothing in Phase 1 reads it.
     lead = (
         it.sort_values(["order_id", "price"], ascending=[True, False])
         .groupby("order_id")
-        .first()[["category", "seller_state", "seller_zip_code_prefix"]]
+        .first()[["category", "seller_id", "seller_state", "seller_zip_code_prefix"]]
         .rename(columns={"category": "lead_category",
+                         "seller_id": "lead_seller_id",
                          "seller_state": "lead_seller_state",
                          "seller_zip_code_prefix": "lead_seller_zip"})
     )

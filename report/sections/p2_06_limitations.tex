@@ -1,0 +1,72 @@
+\section{Limitations and Conclusion}
+\label{sec:limitations}
+
+\paragraph{The models are fitted on a moving target.}
+Mean lead time falls 5.34 days between training and test, and a model fitted on
+the slower past is systematically off-level on the faster present ---
+Section~\ref{sec:results-segments} measures that as a positive bias in every
+region. Hence $R^2$ against a test-period variance is negative even for a useful
+model, which is why MAE leads, and hence the models need refitting on a rolling
+basis rather than once \citep{gama2014drift}: a deployment should refit monthly
+and monitor the gap between predicted and realised lead time as the trigger.
+Calibration belongs in the same cycle --- the probabilities hold on the test
+window, but that is a two-month-ahead check, and a calibration fitted on one
+prior drifts as the prior does.
+
+\paragraph{The largest driver of lateness is not observable at prediction time.}
+The late rate swings between 1.4\% and 21.4\% month to month with Black Friday
+2017 and the May 2018 truckers' strike. These are exogenous shocks --- carrier
+capacity, national road blockades --- that no order-level feature available at
+checkout can anticipate. This, not the choice of algorithm, is the binding
+constraint on Problem 1B, and it is why the ceiling was stated in advance rather
+than a weak classifier presented as a disappointment.
+
+\paragraph{What the data does not contain, and what rests on assumption.}
+The service-quality literature identifies product expectation gaps, seller
+communication and returns handling among the drivers of dissatisfaction
+\citep{parasuraman2005esqual, rao2011elsq}; none appears in these nine tables, so
+the Problem 2 residual is unobserved cause rather than noise, and the free-text
+review columns (present for 11.7\% and 41.3\% of reviews) are too sparse to
+recover it. Olist publishes no cost figures, so Section~\ref{sec:cost} states its
+assumptions and reports break-even precision --- the quantity that decides the
+recommendation and moves with the assumption. And selection votes on three
+out-of-sample windows covering roughly February to June 2018: the right trade
+under drift, but a smaller sample than cross-validation uses, and
+Section~\ref{sec:results-late} records a case where the rule preferred a model
+that does not transfer. We report that rather than quietly selecting on the test
+window.
+
+\paragraph{Generalisation, and what these scores are not.}
+Everything here is Brazil, 2016--2018, on one marketplace with a distinctive
+geography: 59.7\% of sellers sit in São Paulo state against 42.0\% of customers,
+so most orders cross the country and the median one travels 434\,km --- the
+distance-driven structure the models learn is a property of that asymmetry. The
+outputs are triage scores for internal prioritisation, not entitlements, and must
+not be used to penalise a seller, price a customer, or drive an automated
+decision about someone without review. The review-risk model in particular is
+largely a restatement of how late a parcel was, and a seller penalised by it
+would in many cases be penalised for a carrier's failure.
+
+\subsection*{Conclusion}
+
+Two problems, at two prediction moments, from one dataset and one feature
+pipeline. The regression reaches MAE 3.90 days --- 41\% below a constant fitted
+on the past and 60\% below the platform's own promise --- and its output,
+thresholded against that promise, makes a better late-order flag (2.89$\times$
+the no-skill floor) than any classifier trained directly on the binary label
+(1.24$\times$), so the brief's dual framing turns out to be the substantively
+better design. The satisfaction model reaches 3.75$\times$ its floor on a target
+where always predicting ``satisfied'' scores 89\% accuracy and catches nothing,
+and scores identically on customers it has never seen.
+
+The methodological findings travel further. Cross-validation inside a drifting
+training period reorders the candidates relative to the forward window, and a
+two-month validation period is short enough to reorder them again --- so
+selection belongs on several recent out-of-sample windows judged by rank, and
+even then it can fail. Weighting the loss for class imbalance leaves ranking
+unchanged and inflates predicted risk threefold, so the threshold is the right
+lever. Raw PR-AUC is not comparable across periods with different base rates
+while its lift over the floor is. And the most useful business result is a
+negative one: a flag with ROC-AUC 0.782 is genuinely informative and still does
+not justify an expensive intervention, because its precision never clears the
+break-even the cost ratio demands.

@@ -1,0 +1,100 @@
+\section{Interpretation and Business Insight}
+\label{sec:insight}
+
+\subsection{What the models rely on}
+
+Importance is measured by permutation on the held-out window rather than by
+impurity on the training set: impurity-based scores are computed where the model
+was fitted and inflate high-cardinality features \citep{strobl2007importance},
+which with 74 product categories in play is not hypothetical
+(Figure~\ref{fig:importance}).
+
+\textbf{Problem 2 has one dominant driver, and it is actionable.} How late the
+parcel was carries 0.206 of PR-AUC on its own, how long it took a further 0.074,
+the size of the order 0.045; nothing else clears 0.011. The top two account for
+\textbf{76.9\%} of total positive importance. That is the honest description ---
+the model asks how late the parcel was and how big the order was --- and it
+explains why a single depth-limited tree captured 96\% of the achievable signal.
+For the customer-experience team that is good news: the driver is something the
+business already measures and can already act on.
+
+\textbf{Problem 1A's importances must be read with care.} No single feature
+carries much --- the largest, \code{lead\_payment\_type}, costs 0.034 days of
+MAE, and the top two together only 30\% of total positive importance --- and that
+is a property of the measurement. Permutation importance systematically
+understates correlated predictors, because permuting one leaves its substitutes
+intact, and \code{estimated\_days}, \code{hist\_route\_lead\_days},
+\code{hist\_seller\_lead\_days} and \code{log\_distance} all encode overlapping
+information about how far and how long; the selected model is additionally a
+blend, so permuting a column degrades only part of it. The reading that survives
+is negative and worth having: this model has no single point of failure.
+
+\subsection{From a probability to a decision --- and when not to act}
+\label{sec:cost}
+
+A probability is not a decision. Turning one into the other needs a cost, and
+Olist publishes none --- so what follows states its assumptions openly and treats
+the conclusions as shapes rather than numbers \citep{elkan2001cost}. The
+arithmetic is one line: acting is worth it only where
+$\text{precision} > c_{\text{action}} / c_{\text{miss}}$.
+
+\begin{table}[htbp]
+\centering
+\caption{The decision layer under stated (not measured) costs. Break-even
+precision is what decides whether a flag is worth acting on at all.}
+\label{tab:cost}
+\small
+\begin{tabular}{@{}lrrrl@{}}
+\toprule
+\textbf{Flag} & \textbf{$c_{\text{action}}$ : $c_{\text{miss}}$} &
+\textbf{break-even} & \textbf{best achieved} & \textbf{verdict} \\
+\midrule
+Low-review risk, at delivery & R\$5 : R\$40  & 0.125 & 0.37 at the optimum & \best{act} \\
+Late-order flag, at checkout & R\$12 : R\$40 & 0.300 & 0.29 at any volume & do not expedite \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{The review flag pays, comfortably.} Contacting a customer who was never
+going to complain costs perhaps R\$5 of agent time; a 1--2 star review that could
+have been headed off costs perhaps R\$40 --- standing in for the damage
+\citet{deshpande2023logistics} trace through to seller sales. Break-even
+precision is 0.125 and the model reaches 0.369 at its expected-benefit optimum,
+flagging 1{,}927 of 12{,}855 delivered orders (15.0\%) of which 712 do go on to
+leave a low review, for a net \textbf{R\$1{,}466 per 1{,}000 delivered orders}
+(Figure~\ref{fig:threshold}). The margin is wide enough that the conclusion
+survives a wrong cost estimate.
+
+\textbf{The late-order flag does not pay --- for an expensive action.} This is the
+more useful finding, and reporting discrimination alone would have missed it.
+Expediting freight costs perhaps R\$12 against the same R\$40 of downstream
+damage, so break-even precision is 0.300 --- and the derived flag never reaches
+it: precision plateaus at \textbf{0.29} and falls as volume rises, so expected net
+benefit is negative at every threshold flagging a meaningful number of orders. A
+model with ROC-AUC 0.782 and 2.9$\times$ the no-skill floor is genuinely
+informative and still not worth paying R\$12 an order to act on. That changes
+\emph{which} action it justifies rather than making it useless, because
+break-even falls with the cost of the intervention and two of the available
+interventions cost almost nothing. \textbf{Re-quoting} the promised date is free:
+the platform's own estimate is off by 9.79 days of MAE against the model's 3.90,
+so the date shown at checkout could be materially tightened, which
+\citet{cui2024promise} show trades directly against returns and retention.
+\textbf{Pre-warning} the buyer is nearly free, and at a threshold of 0.11 the
+flag catches \textbf{82.6\%} of the orders that will miss their date.
+
+\subsection{What each stakeholder does with this}
+
+\textbf{Operations, at checkout:} tighten the quoted delivery date using the
+model's estimate, and send a proactive notice on the orders flagged at the
+recall-oriented threshold, which covers five in six of those that will actually
+miss. Reserve expedited freight for the small high-precision tail, and revisit
+that policy if expediting falls below about R\$12 an order.
+\textbf{Customer experience, at delivery:} work the flagged list before the
+review window closes --- 7.6\% of deliveries at the tuned threshold, catching
+39.8\% of the orders that would draw a 1--2 star review at 57.5\% precision, or
+15.0\% at the cost-optimal threshold for a wider net.
+
+These are not two systems: the order flagged at checkout is the order that
+arrives late, and the order that arrives late is the one flagged for outreach, so
+the first gives operations a chance to prevent the cost the second is left
+measuring.

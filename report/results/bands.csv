@@ -1,0 +1,7 @@
+metric,value,band,verdict
+p1a_mae,3.898,"[3.3, 4.3]",in band
+p1b_balanced_accuracy,0.7045,"[0.58, 0.72]",in band
+p1b_roc_auc,0.782,"[0.72, 0.85]",in band
+p2_balanced_accuracy,0.6806,"[0.63, 0.74]",in band
+p2_roc_auc,0.749,"[0.7, 0.79]",in band
+p2_pr_auc,0.4137,"[0.34, 0.48]",in band

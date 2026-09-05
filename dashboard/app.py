@@ -1,12 +1,19 @@
 """
-Olist Brazilian E-Commerce - IT5006 Phase 1 exploratory dashboard.
+Olist Brazilian E-Commerce - IT5006 Group 10 dashboard.
 
 Run locally:
-    python src/build_dashboard_data.py      # once, builds the 4 MB artifact
+    python src/train_models.py      # once, fits the models into models/
     streamlit run dashboard/app.py
 
-The artifact is produced by the same data_load + features pipeline the notebooks
-and the report use, so no figure here can disagree with the PDF.
+Two halves, matching the two project phases:
+
+  Phase 1  five exploratory tabs over the joined nine-table order frame.
+  Phase 2  a scoring tab that serves the fitted models, and a model card.
+
+Both halves read the same src/data_load.py and src/features.py the notebooks and
+the reports use, so no figure here can disagree with either PDF. The Phase 2 tabs
+load their artifacts lazily, so a visitor who only browses the EDA never pays for
+unpickling a model.
 """
 from __future__ import annotations
 
@@ -23,6 +30,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+import predict
 import theme
 
 st.set_page_config(
@@ -93,16 +101,19 @@ except Exception as exc:  # noqa: BLE001 - last-resort guard for a public app
 # ===========================================================================
 with st.sidebar:
     st.markdown("### 📦 Olist Explorer")
-    st.caption("IT5006 Phase 1 · Group 10")
+    st.caption("IT5006 · Group 10 · Phases 1–2")
 
     with st.expander("ℹ️  How to use this dashboard", expanded=False):
         st.markdown(
-            "1. **Filter** below — every tab responds.\n"
+            "1. **Filter** below — the five exploratory tabs respond.\n"
             "2. **Overview** — volume, revenue and the Black Friday spike.\n"
             "3. **Delivery** — the drift and volatility that shape the modelling.\n"
             "4. **Geography** — where buyers and sellers are, and what that costs.\n"
             "5. **Satisfaction** — how lateness turns into bad reviews.\n"
-            "6. **Data quality** — what is missing and why.\n\n"
+            "6. **Data quality** — what is missing and why.\n"
+            "7. **Predict** — score one order or a whole CSV against the fitted "
+            "models. Not affected by the filters.\n"
+            "8. **Model card** — how the models were built and where they fail.\n\n"
             "Charts are interactive: drag to zoom, double-click to reset."
         )
 
@@ -159,12 +170,14 @@ with st.sidebar:
 # ===========================================================================
 st.markdown(
     theme.masthead(
-        "IT5006 · Phase 1 · Exploratory Data Analysis",
+        "IT5006 · Group 10 · Exploration and Prediction",
         "Olist Brazilian E-Commerce, 2017–2018",
         f"{len(DF):,} orders joined from <b>nine relational tables</b> · one row per "
         f"order · {DF['lead_category'].nunique()} product categories across "
-        f"{DF['customer_state'].nunique()} states. Every view reads the same "
-        f"pipeline as the report, so the numbers cannot diverge.",
+        f"{DF['customer_state'].nunique()} states. The first five tabs explore the "
+        f"data; <b>Predict</b> serves the fitted models and <b>Model card</b> "
+        f"reports what they can and cannot do. Every view reads the same pipeline "
+        f"as the reports, so the numbers cannot diverge.",
     ),
     unsafe_allow_html=True,
 )
@@ -173,8 +186,9 @@ if d.empty:
     st.warning("**No orders match the current filters.** Widen the selection in the sidebar.")
     st.stop()
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["Overview", "Delivery", "Geography", "Satisfaction", "Data quality"]
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+    ["Overview", "Delivery", "Geography", "Satisfaction", "Data quality",
+     "🔮 Predict", "Model card"]
 )
 
 
@@ -518,9 +532,23 @@ with tab5:
         unsafe_allow_html=True,
     )
 
+# ===========================================================================
+# Tab 6 - Predict  (Phase 2)
+# ===========================================================================
+with tab6:
+    predict.render_predict(DF)
+
+
+# ===========================================================================
+# Tab 7 - Model card  (Phase 2)
+# ===========================================================================
+with tab7:
+    predict.render_model_card()
+
+
 st.markdown("---")
 st.caption(
-    "IT5006 Fundamentals of Data Analytics · Group Project Phase 1 · "
-    "National University of Singapore. Built with Streamlit. Source: "
-    "https://github.com/gengyuzhu/IT5006-Group-Project-10"
+    "IT5006 Fundamentals of Data Analytics · Group Project · National University "
+    "of Singapore. Built with Streamlit. Source: "
+    "https://github.com/gengyuzhu/Team10_IT5006_Ecommerce_Analytics_AY2627Sem1"
 )

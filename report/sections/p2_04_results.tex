@@ -1,0 +1,222 @@
+\section{Results}
+\label{sec:results}
+
+Everything below is the untouched test window, 2018-07-01 to 2018-08-31, scored
+once for models already chosen. Cross-validated and validation columns sit beside
+it because the disagreement between them is part of the result. Figures are in
+Appendix~\ref{app:figures}.
+
+\subsection{Problem 1A --- lead time}
+\label{sec:results-reg}
+
+\begin{table}[htbp]
+\centering
+\caption{Lead-time regression: two reference points that are not models, then
+each family's complexity ladder. \best{Bold} is the selected model.
+Figure~\ref{fig:ladder}.}
+\label{tab:reg}
+\small
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+\textbf{Model} & \textbf{Family} & \textbf{CV MAE} & \textbf{Val MAE} &
+\textbf{Test MAE} & \textbf{RMSE} & \textbf{$R^2$} \\
+\midrule
+Mean of the training period      & baseline & ---  & ---  & 6.645 & 7.572 & $-0.990$ \\
+Olist's own delivery promise     & baseline & ---  & ---  & 9.788 & 12.155 & $-4.130$ \\
+\midrule
+LinearRegression \emph{(rung 0)} & A linear & 5.242 & 4.965 & 4.181 & 5.639 & $-0.104$ \\
+Ridge \emph{(rung 1)}            & A linear & 5.201 & 5.164 & 4.309 & 5.775 & $-0.158$ \\
+DecisionTree \emph{(rung 0)}     & B tree   & 5.539 & 5.927 & 6.116 & 8.664 & $-1.606$ \\
+RandomForest \emph{(rung 1)}     & B tree   & 5.457 & 5.513 & 4.956 & 6.169 & $-0.321$ \\
+HistGradientBoosting \emph{(rung 2)} & B tree & 5.495 & 4.802 & 4.141 & 5.517 & $-0.057$ \\
+\best{VotingRegressor (A+B)}     & C ensemble & 5.315 & \best{4.784} & \best{3.898} & \best{5.342} & \best{$+0.009$} \\
+StackingRegressor (A+B)          & C ensemble & 5.443 & 4.792 & 4.121 & 5.430 & $-0.024$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The selected model puts mean absolute error at \textbf{3.90 days}: \textbf{41.3\%
+below} a constant fitted on the training period and \textbf{60.2\% below the
+platform's own promised date}. That second comparison is the one operations cares
+about, and its direction is not anomalous --- a promised date is a commercial
+decision, padded because a broken promise costs returns and retention
+\citep{cui2024promise}. It is an excellent feature and a poor forecast.
+
+Three things matter more than the winner. \textbf{Regularisation does not pay:}
+Ridge is \emph{worse} than plain least squares on validation (5.164 against
+4.965) and on test (4.309 against 4.181), with a tuned $\alpha$ of 660 that
+cross-validation preferred and no later window did --- within family A, rung 1
+fails to beat rung 0. \textbf{Inside family B complexity does pay}, monotonically
+on validation: 5.927 $\rightarrow$ 5.513 $\rightarrow$ 4.802. And \textbf{only
+the ensemble has a positive $R^2$}; every other model is negative, which is the
+signature of a level shift rather than of a useless model, and the reason MAE
+leads throughout. The blend beats both its members (4.181 and 4.141 against
+3.898) by a specific mechanism: a tree cannot predict outside the range of the
+targets it was fitted on, because every leaf averages training values, and
+test-window lead times are systematically shorter than anything common in
+training. A linear model has no such bound and extrapolates the level
+(Figure~\ref{fig:extrap}). Averaging is one member covering the other's exact
+failure, which is why the weights are fixed at 1:2 in the tree's favour rather
+than tuned.
+
+\subsection{Problem 1B --- late against the promise}
+\label{sec:results-late}
+
+\begin{table}[htbp]
+\centering
+\caption{The late-order flag, best of each route; the full seven-candidate table
+is in \code{report/results/clf\_p1b.csv}. No-skill PR-AUC floor 0.074.
+Figure~\ref{fig:routes}.}
+\label{tab:late}
+\small
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+\textbf{Route} & \textbf{Model} & \textbf{ROC-AUC} & \textbf{PR-AUC} &
+\textbf{lift} & \textbf{bal.\ acc} & \textbf{F1} \\
+\midrule
+direct  & best of five (HistGradientBoosting) & 0.584 & 0.092 & 1.24$\times$ & 0.524 & 0.134 \\
+derived & predicted days $>$ promised days, unfitted & 0.569 & 0.109 & 1.47$\times$ & 0.569 & 0.214 \\
+\best{derived} & \best{regression margin, calibrated} & \best{0.782} & \best{0.214} & \best{2.89$\times$} & \best{0.705} & \best{0.235} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The deliverable is the derived route, and that follows from the framing fixed in
+Section~\ref{sec:problem} rather than from the numbers: Problem 1 is the brief's
+dual framing, so the flag \emph{is} the regression's own answer compared against
+the promised date. The five direct classifiers answer a different question ---
+does the flag need a model of its own? It does not. The derived route reaches
+\textbf{2.89$\times$} the no-skill floor where the best direct classifier reaches
+1.24$\times$, and it costs no additional model: the margin
+$\hat{y} - \text{promised}$ is mapped to a probability by a single-parameter
+logistic \citep{platt1999probabilistic} fitted on validation. Even the
+zero-parameter rule --- flag whenever the model expects a miss --- beats every
+fitted classifier.
+
+\paragraph{The selection protocol got this one wrong, and that is worth reporting.}
+Applied to these seven candidates the rolling-origin rule of Section~\ref{sec:cv}
+ranks a direct classifier first. On every in-training window the candidates sit
+within noise of one another --- in the fifth fold they span 0.206 to 0.362, with
+the derived route mid-pack --- so the rule has almost nothing to separate them
+on, and separates them on noise; on the forward window the gap opens to a factor
+of 2.3. The monthly series explains why: the later training folds and the
+validation period are dominated by the February--April 2018 congestion, when the
+late rate ran at 16.0\% and 21.4\%, and by the May strike. A classifier can fit a
+regime; the derived route encodes a mechanism, and mechanisms transfer. We report
+the disagreement rather than presenting the rule as having chosen this, and note
+that confirming the preference would need a further forward window we do not
+have.
+
+\subsection{Problem 2 --- low-review risk}
+\label{sec:results-review}
+
+\begin{table}[htbp]
+\centering
+\caption{Low-review classification at delivery. Accuracy is printed beside the
+majority-class rule that scores 0.890 while catching nothing. No-skill PR-AUC
+floor 0.110. Figure~\ref{fig:lowreview}.}
+\label{tab:review}
+\small
+\begin{tabular}{@{}llrrrrrrrr@{}}
+\toprule
+\textbf{Model} & \textbf{Fam.} & \textbf{Val PR} & \textbf{ROC} &
+\textbf{PR-AUC} & \textbf{lift} & \textbf{bal.\ acc} & \textbf{F1} &
+\textbf{acc} & \textbf{Brier} \\
+\midrule
+LogisticRegression \emph{(r0)}   & A & 0.320 & 0.659 & 0.291 & 2.63$\times$ & 0.636 & 0.345 & 0.847 & 0.090 \\
+LogisticRegression ($\ell_2$) \emph{(r1)} & A & 0.320 & 0.659 & 0.291 & 2.63$\times$ & 0.636 & 0.342 & 0.843 & 0.090 \\
+DecisionTree \emph{(r0)}         & B & 0.389 & 0.722 & 0.396 & 3.59$\times$ & 0.677 & 0.461 & 0.899 & 0.080 \\
+RandomForest \emph{(r1)}         & B & 0.403 & 0.744 & 0.405 & 3.67$\times$ & 0.680 & 0.470 & 0.901 & 0.078 \\
+HistGradientBoosting \emph{(r2)} & B & 0.407 & 0.749 & 0.415 & 3.76$\times$ & 0.680 & 0.471 & 0.902 & 0.078 \\
+VotingClassifier (A+B)           & C & 0.404 & 0.747 & 0.407 & 3.69$\times$ & 0.683 & 0.448 & 0.885 & 0.079 \\
+\best{StackingClassifier (A+B)}  & C & \best{0.409} & 0.749 & 0.414 & 3.75$\times$ & 0.681 & 0.470 & 0.901 & 0.078 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The selected model reaches \textbf{ROC-AUC 0.749}, \textbf{balanced accuracy
+0.681} and \textbf{PR-AUC 0.414 --- 3.75$\times$ the no-skill floor}. Its raw
+accuracy is 0.901 against a majority-class rule scoring 0.890, which is exactly
+why accuracy is printed but never led with. The tree family beats the linear one
+by 1.43$\times$ on PR-AUC --- but a \emph{single depth-limited decision tree}
+already reaches 0.396 of the eventual 0.414, so 96\% of the achievable signal
+comes from one interpretable tree. And the model does not memorise buyers: on the
+12{,}617 test orders from customers never seen in training it scores PR-AUC
+\textbf{0.415} against 0.414 overall.
+
+\paragraph{Class weighting: the ablation Phase 1 promised.}
+On the best tree model, weighting the loss moves ROC-AUC from 0.749 to 0.747 and
+PR-AUC from 0.415 to 0.411 --- no gain --- while the Brier score degrades from
+\textbf{0.0778 to 0.1331}, a 71\% deterioration, and mean predicted risk inflates
+from 0.119 to \textbf{0.337} against an actual rate of 0.110. The weighted model
+overstates every customer's risk threefold (Figure~\ref{fig:calibration}). We
+therefore fit on the observed prior and move the threshold instead. Tuned on
+validation by maximising F1 it lands at 0.19 rather than 0.50, which on the test
+window raises F1 from 0.414 to \textbf{0.470} and recall from 0.297 to 0.398 at a
+precision cost of 0.686 to 0.575, flagging 7.6\% of delivered orders instead of
+4.8\%. Calibration holds where the volume is: in the two bins containing
+11{,}892 of the 12{,}855 test orders the gap between predicted risk and observed
+rate is under 0.013.
+
+\subsection{What the cross-validation protocol was telling us}
+\label{sec:results-protocol}
+
+\begin{table}[htbp]
+\centering
+\caption{One model, three protocols. Raw average precision disagrees; the same
+numbers divided by each period's no-skill floor do not.
+Figure~\ref{fig:protocol}.}
+\label{tab:protocol}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Protocol} & \textbf{PR-AUC} & \textbf{fold spread} & \textbf{no-skill floor} & \textbf{lift} \\
+\midrule
+\code{TimeSeriesSplit}, expanding window & 0.562 & $\pm$0.091 & 0.158 & 3.55$\times$ \\
+\code{StratifiedGroupKFold}, shuffled    & 0.580 & $\pm$0.006 & 0.158 & 3.66$\times$ \\
+Forward test window --- the truth        & 0.414 & ---        & 0.110 & 3.75$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Both cross-validated estimates sit about 0.16 above the forward result, which
+looks like catastrophic optimism --- and almost all of it is mechanical. Average
+precision's no-skill baseline \emph{is} the positive rate
+\citep{saito2015prplot}, and the low-review rate falls from 15.8\% inside the
+training period to 11.0\% in the test window; normalised by that floor the three
+agree to within 0.2 of a multiple. \textbf{Raw PR-AUC is not comparable across
+periods with different base rates; its lift over the floor is} --- and quoting
+the raw number alone would have supported either a claim of severe overfitting or
+a claim of none. The shuffled protocol adds a second warning: its fold-to-fold
+spread is $\pm$0.006 against the temporal protocol's $\pm$0.091, an interval
+fifteen times narrower on an estimate no closer to the truth.
+
+\subsection{Does the third family earn its place, and where do the models fail?}
+\label{sec:results-ensemble}
+
+Family C is selected on both problems and the honest answer differs. On
+\textbf{lead time} it earns its place: the Voting blend improves on the better of
+its members by 0.24 days of MAE (5.9\%) and is the only model in
+Table~\ref{tab:reg} with a positive $R^2$, for the extrapolation reason above. On
+\textbf{review risk} it does not: Stacking wins the rank vote by a nose, then
+matches the boosted trees to three decimals on ROC-AUC and comes in 0.001
+\emph{below} them on PR-AUC, so a deployment could ship the single boosted model
+with no measurable loss. That is worth saying because the ensemble was
+\emph{flattered} here: stacking builds meta-features with
+\code{cross\_val\_predict}, which needs the inner folds to partition the training
+set, and an expanding window partitions nothing --- so the inner CV must be
+contiguous \code{KFold} and the meta-learner sees predictions partly made by
+models trained on later orders (Appendix~\ref{app:hyperparameters}). Being
+flattered and still failing to separate is a safer conclusion than the reverse.
+
+\label{sec:results-segments}
+Across geography the review model is remarkably stable: ROC-AUC runs 0.744 to
+0.778 across the five Brazilian regions, with lift over each region's own floor
+between 3.6$\times$ and 5.0$\times$. The regression is not
+(Figure~\ref{fig:segments}): MAE runs from 3.42 days in the Southeast, where most
+orders are, to \textbf{6.84 days in the North}, and the bias is positive
+everywhere --- $+1.15$ days in the Southeast rising to $+4.77$ in the North. The
+model \emph{over-predicts lead time everywhere}, most severely where deliveries
+are longest, which is exactly what a model fitted on a slower past does when
+fulfilment has improved underneath it, and the strongest argument here for
+refitting on a rolling basis.

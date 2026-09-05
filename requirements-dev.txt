@@ -10,13 +10,10 @@
 
 -r requirements.txt
 
-scikit-learn==1.5.2        ; python_version < "3.13"
-scikit-learn>=1.7.2,<2     ; python_version >= "3.13"
-
-# Pulled in by scikit-learn; pinned explicitly because it affects the numerics
-# behind every model result quoted in the report.
-scipy==1.14.1              ; python_version < "3.13"
-scipy>=1.16.2,<2           ; python_version >= "3.13"
+# scikit-learn, scipy and joblib moved into requirements.txt for Phase 2 - the
+# deployed app serves models now, so they are runtime dependencies rather than
+# analysis-only ones. Everything below is still needed only to regenerate the
+# figures and re-execute the notebooks.
 
 matplotlib==3.9.2          ; python_version < "3.13"
 matplotlib>=3.10.6,<4      ; python_version >= "3.13"

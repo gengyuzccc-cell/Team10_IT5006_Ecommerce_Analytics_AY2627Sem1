@@ -1,0 +1,280 @@
+\section{Reproducing this report}
+\label{app:repro}
+
+\begin{table}[htbp]
+\centering
+\caption{Everything in this document is generated. The order below is the order
+to run it in. The fitting step dominates; the rest takes under two minutes.}
+\label{tab:repro}
+\small
+\begin{tabular}{@{}p{5.4cm}p{9.4cm}@{}}
+\toprule
+\textbf{Command} & \textbf{What it produces} \\
+\midrule
+\code{pip install -r requirements-dev.txt} & The full analysis environment.
+\code{requirements.txt} alone is the deployment runtime \\[3pt]
+\code{python tests/test\_leakage.py} & 32 validation checks: join grain, the
+history construction against a brute-force recomputation, the leakage guard in
+both directions, split disjointness, Phase 1 backward compatibility \\[3pt]
+\code{python src/train\_models.py} & Fits every model, scores the test window
+once, writes \code{models/} and every result table into \code{report/results/} \\[3pt]
+\code{python src/figures\_phase2.py} & Draws every figure as vector PDF into
+\code{report/figures/} from those tables \\[3pt]
+\code{python src/phase2\_stats.py} & Distils every number quoted in this report
+into \code{report/stats\_phase2.txt}. Diff it against the manuscript \\[3pt]
+\code{python src/report\_stats.py} & Still reproduces the \emph{Phase 1} numbers
+unchanged --- the check that the Phase 2 feature additions are backward
+compatible \\[3pt]
+\code{streamlit run dashboard/app.py} & The dashboard, including the Predict tab
+that serves the models above \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\code{SEED = 42} is set in every estimator, every randomised search and every
+subsample. Both requirements files pin exact versions on Python $\le$ 3.12, the
+interpreter every reported number was produced on. Model artifacts record the
+\code{scikit-learn} version that wrote them and \code{modeling.load\_model()}
+checks it on the way back in.
+
+\section{Success criteria registered in advance}
+\label{app:bands}
+
+Written into \code{config.EXPECTED\_BANDS} before any Phase 2 model was tuned.
+\code{evaluate.check\_bands()} compares the headline results against them at the
+end of every training run and writes its verdicts to
+\code{report/results/bands.csv}. The alarm is direction-aware: for an error
+metric the suspicious end of the interval is the low one, for a score the high
+one, and confusing the two would point the check at the shortfalls and wave the
+leaks through.
+
+\begin{center}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Problem} & \textbf{Metric} & \textbf{Registered band} & \textbf{Where the range came from} \\
+\midrule
+1A & MAE (days) & 3.3 -- 4.3 & Phase 1 reported 3.89 untuned \\
+1B & balanced accuracy & 0.58 -- 0.72 & Phase 1 reported 0.58 for a direct classifier \\
+1B & ROC-AUC & 0.72 -- 0.85 & Untuned scoping probe reached 0.79 for the derived route \\
+2 & balanced accuracy & 0.63 -- 0.74 & Phase 1 reported 0.69 \\
+2 & ROC-AUC & 0.70 -- 0.79 & Phase 1 reported 0.73 \\
+2 & PR-AUC & 0.34 -- 0.48 & Phase 1 reported 0.40 against a 0.11 floor \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Hyperparameter search spaces and selected values}
+\label{app:hyperparameters}
+
+\begin{center}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Family} & \textbf{Rung} & \textbf{Classification} & \textbf{Regression} \\
+\midrule
+A --- Linear     & 0 & \code{LogisticRegression} & \code{LinearRegression} \\
+                 & 1 & \code{LogisticRegression} ($\ell_2$, tuned $C$) & \code{Ridge} (tuned $\alpha$) \\
+B --- Tree-based & 0 & \code{DecisionTreeClassifier} & \code{DecisionTreeRegressor} \\
+                 & 1 & \code{RandomForestClassifier} & \code{RandomForestRegressor} \\
+                 & 2 & \code{HistGradientBoostingClassifier} & \code{HistGradientBoostingRegressor} \\
+C --- Ensemble   & 0 & \code{VotingClassifier} (soft, A+B) & \code{VotingRegressor} (A+B) \\
+                 & 1 & \code{StackingClassifier} (A+B) & \code{StackingRegressor} (A+B) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Every tuned model was searched with \code{RandomizedSearchCV} over the
+distributions below, scored by five-fold expanding-window cross-validation inside
+the training period. Thirty draws per model, except the random forests, which get
+six: a forest costs one to two orders of magnitude more per fit than the other
+rungs, and Phase 1 had already shown the forest and the boosted trees landing
+within 0.01 days of each other. That is a documented trade rather than a hidden
+one.
+
+\begin{table}[htbp]
+\centering
+\caption{Search spaces. Selected values are in
+\code{report/results/reg\_p1a.csv}, \code{clf\_p1b.csv} and \code{clf\_p2.csv},
+and are reproduced in \code{models/model\_metadata.json}.}
+\label{tab:spaces}
+\small
+\begin{tabular}{@{}llp{9.4cm}@{}}
+\toprule
+\textbf{Model} & \textbf{Draws} & \textbf{Distributions} \\
+\midrule
+\code{LinearRegression} / \code{LogisticRegression} & --- &
+No free parameters. Fitted and scored under the same protocol so the row is
+comparable \\[3pt]
+\code{Ridge} & 30 & $\alpha \sim \mathrm{loguniform}(10^{-3}, 10^{3})$ \\[3pt]
+\code{LogisticRegression} ($\ell_2$) & 30 & $C \sim \mathrm{loguniform}(10^{-3}, 10^{2})$ \\[3pt]
+\code{DecisionTree} & 30 & \code{max\_depth} $\sim$ randint(3, 20);
+\code{min\_samples\_leaf} $\sim$ randint(5, 200) [classifier: (20, 400)];
+\code{max\_features} $\sim U(0.4, 1.0)$ \\[3pt]
+\code{RandomForest} & 6 & 150 trees; \code{max\_depth} $\sim$ randint(8, 18)
+[classifier: (6, 16)]; \code{min\_samples\_leaf} $\sim$ randint(20, 140)
+[classifier: (30, 180)]; \code{max\_features} $\sim U(0.15, 0.40)$ \\[3pt]
+\code{HistGradientBoosting} & 30 & \code{max\_iter} $\sim$ randint(120, 500);
+\code{learning\_rate} $\sim \mathrm{loguniform}(0.02, 0.3)$;
+\code{max\_leaf\_nodes} $\sim$ randint(15, 64);
+\code{min\_samples\_leaf} $\sim$ randint(10, 120);
+\code{l2\_regularization} $\sim \mathrm{loguniform}(10^{-4}, 10)$ \\[3pt]
+\code{Voting} & --- & Weights fixed at 1:2 in the tree's favour. A stated prior,
+not a tuned parameter: under drift the linear member is materially weaker and an
+equal blend would be worse than its better half \\[3pt]
+\code{Stacking} & --- & Meta-learner \code{Ridge}($\alpha=1$) /
+\code{LogisticRegression}; inner CV five contiguous folds --- see the note below \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{A compromise inside stacking, stated plainly.}
+\code{StackingClassifier} and \code{StackingRegressor} build their meta-features
+with \code{cross\_val\_predict}, which requires the inner folds to \emph{partition}
+the training set: every row must be predicted exactly once. An expanding window
+partitions nothing --- the earliest rows are never in a test fold --- so the
+closest valid approximation is unshuffled \code{KFold}, which at least keeps each
+fold contiguous in time. The meta-learner is consequently fitted on out-of-fold
+predictions partly made by models trained on later orders.
+
+The residual optimism is confined to the meta-learner's coefficients; the base
+models are refitted on the whole training period afterwards, and the outer
+protocol scoring the finished ensemble is still the expanding window. It matters
+less than it otherwise would because of how the result lands: the ensemble is
+\emph{flattered} by this arrangement and still does not win, which makes the
+conclusion in Section~\ref{sec:results-ensemble} safer rather than weaker.
+
+\section{Re-checking a Phase 1 claim about least squares}
+\label{app:encoding}
+
+Phase 1 reported that ordinary least squares was unusable on this design matrix
+--- ``rank-deficient, so its coefficients explode''. Phase 2 re-ran it four ways.
+The observation reproduces exactly; the conclusion drawn from it needed
+correcting.
+
+\begin{table}[htbp]
+\centering
+\caption{Reproducible via \code{report/results/encoding\_diagnostic.csv}. The
+deficiency is exactly four --- one per categorical, because each one-hot block
+sums to one and is therefore collinear with the intercept.}
+\label{tab:encoding}
+\small
+\begin{tabular}{@{}lccrrr@{}}
+\toprule
+\textbf{Encoding} & \textbf{rank / cols} & \textbf{deficiency} &
+\textbf{max $|\beta|$} & \textbf{CV MAE} & \textbf{test MAE} \\
+\midrule
+OLS, full one-hot block   & 101 / 105 & 4 & $2.7\times10^{13}$ & $3.9\times10^{11}$ & 4.181 \\
+OLS, one level dropped    & 101 / 101 & 0 & 14.7  & 5.242 & 4.181 \\
+Ridge, full one-hot block & 101 / 105 & 4 & 9.82  & 5.241 & 4.182 \\
+Ridge, one level dropped  & 101 / 101 & 0 & 12.5  & 5.240 & 4.183 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Least squares still returns a minimum-norm solution and its \emph{predictions}
+are fine --- 4.181 days on the test window, indistinguishable from Ridge. What is
+not fine is the coefficient vector at $10^{13}$, and the cancellation holding it
+together is fragile enough to fail on one of five expanding-window folds, which
+is why the cross-validated error is astronomical while the single-split test
+error looks healthy. A single train/test split would never have shown it.
+
+Dropping one level per categorical restores full rank, so the linear family is
+encoded that way. The compromise is small and worth stating: an all-zero row is
+also how the encoder represents a level it has never seen, so under
+\code{drop="first"} a novel payment type is scored as the reference level. One
+payment level is unseen in the test window, affecting a handful of orders.
+Leaving the design rank-deficient costs more.
+
+The last row carries the real lesson, and it is not the one Phase 1 drew. Once
+the design is full rank, Ridge and OLS agree to three decimals. Regularisation
+buys numerical stability here, not accuracy.
+
+\section{Full result tables}
+\label{app:tables}
+
+The body reports the models that matter. The complete tables --- every model,
+every metric, cross-validated, validation and test scores side by side --- are
+written by \code{src/train\_models.py} to \code{report/results/}:
+
+\begin{center}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{File} & \textbf{Contents} \\
+\midrule
+\code{reg\_p1a.csv} & Problem 1A: baselines, both ladders, ensembles; MAE, RMSE, $R^2$ \\
+\code{clf\_p1b.csv} & Problem 1B: five direct classifiers and two derived routes \\
+\code{clf\_p2.csv} & Problem 2: both ladders and both ensembles, all metrics \\
+\code{encoding\_diagnostic.csv} & The Phase 1 re-check of Table~\ref{tab:encoding} \\
+\code{cv\_protocol.csv} & Temporal against shuffled CV against the forward test \\
+\code{weight\_ablation.csv} & Class weighting: discrimination and calibration \\
+\code{calibration\_p2.csv}, \code{threshold\_sweep\_p2.csv} & Reliability and the operating-point sweep \\
+\code{cost\_p2.csv}, \code{cost\_p1b.csv} & Expected net benefit by threshold \\
+\code{perm\_p1a.csv}, \code{perm\_p2.csv} & Permutation importance on the test window \\
+\code{segments\_*.csv} & Performance by region, category and test month \\
+\code{predictions\_*.csv} & Per-order test predictions, from which the figures are drawn \\
+\code{bands.csv} & Headline metrics against the bands registered in advance \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Deployment}
+\label{app:deployment}
+
+The dashboard at \url{https://it5006-group-project-10.streamlit.app} carries the
+five Phase 1 exploratory tabs unchanged and adds two.
+
+\textbf{Predict} scores a single order entered as it would look at checkout ---
+route, basket, timing and payment --- and returns the expected lead time, the
+risk of missing the promised date against the tuned threshold, and the resulting
+low-review risk. It also scores an uploaded CSV and returns it with the three
+predictions appended. Nothing there reimplements the training-time feature
+engineering: a form submission is turned back into a one-row order frame and
+pushed through the same \code{features.py} builders the models were fitted on,
+which is what stops a feature being computed one way in training and another way
+in production. The one thing a form cannot supply is a seller's track record, so
+\code{models/history\_lookup.csv} carries those aggregates at each level of the
+same fallback chain \code{add\_history()} uses.
+
+\textbf{Model card} reports the training window, the selected models and their
+hyperparameters, the test metrics, the decision thresholds, and an explicit list
+of situations in which the models should not be trusted.
+
+Engineering constraints are recorded rather than discovered later. The deployed
+estimators are the histogram-boosted variants, whose pickles are a few hundred
+kilobytes; a random forest of the same accuracy pickles to 24--30\,MB, which is
+hostile to a shared container. Total artifact size is under 2\,MB.
+\code{requirements.txt} pins \code{scikit-learn} to the exact version the models
+were trained on and the loader raises a visible warning if it ever drifts. Models
+are loaded lazily, so a visitor who only browses the exploratory tabs never pays
+for unpickling one. Invalid input --- a promised date before the purchase date, a
+negative price, more sellers than items, a malformed or empty upload, a missing
+column --- produces a specific message rather than a traceback. No credentials
+appear anywhere in the repository.
+
+\section{Contributions}
+\label{app:contributions}
+
+\begin{center}
+\small
+\begin{tabular}{@{}lp{11.2cm}@{}}
+\toprule
+\textbf{Member} & \textbf{Contribution} \\
+\midrule
+Pan Pinyou & Problem scoping and stakeholder framing; feature engineering for the
+track-record features; business interpretation and the cost analysis; report
+Sections~\ref{sec:problem} and \ref{sec:insight} \\[3pt]
+Li Yudan & Modelling pipeline and the family ladders; hyperparameter search;
+imbalance and calibration analysis; report Sections~\ref{sec:method} and
+\ref{sec:results-review} \\[3pt]
+Zhu Gengyu & Data pipeline and the leakage guard; cross-validation protocol and
+the direct-against-derived comparison; dashboard, deployment and reproducibility
+infrastructure; report Sections~\ref{sec:data}, \ref{sec:results-reg} and
+\ref{sec:limitations} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+All three members reviewed every section and verified the reported numbers
+against \code{report/stats\_phase2.txt}.

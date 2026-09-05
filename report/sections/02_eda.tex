@@ -1,0 +1,191 @@
+\section{Exploratory Data Analysis}
+
+\subsection{Dataset overview and data model}
+
+The dataset comprises \textbf{nine} related CSV tables totalling roughly 1.45
+million rows. \code{orders} is the spine, at 99{,}441 rows -- one per order --
+and the other eight attach to it directly or through \code{order\_items}.
+Figure~\ref{fig:datamodel} shows the recovered structure and
+Table~\ref{tab:dictionary} gives the full data dictionary.
+
+Three tables are \textbf{one-to-many} against orders, and joining them naively is
+the first trap the data sets: a direct orders--items--payments merge yields
+118{,}437 rows rather than 99{,}441, a 19\% inflation that silently reweights
+every mean towards large orders. We aggregate each child table to one row per
+order first, then join, asserting the grain afterwards.
+
+The second trap is identity. \code{customer\_id} is regenerated for every order,
+so it is an order key, not a person: 99{,}441 distinct \code{customer\_id} values
+map to only \textbf{96{,}096} distinct \code{customer\_unique\_id} values.
+Grouping on the wrong one reports zero repeat buyers; the right one finds 2{,}997
+people (3.1\%) who ordered again, one of them 17 times. We carry
+\code{customer\_unique\_id} throughout and split on it
+(Section~\ref{sec:candidates}).
+
+\subsection{Data quality}
+
+Table~\ref{tab:quality} records every issue and our decision; the decisions live
+in \code{src/data\_load.py}, so the code and this table cannot drift apart.
+
+Missingness here is \textbf{structural rather than random}. 97.0\% of orders reach
+status \emph{delivered}; the rest are shipped, cancelled, unavailable or still
+processing, and 2.98\% therefore carry no delivery timestamp. That is not a defect
+to impute -- the event has not happened -- so delivery targets are undefined there
+and excluded from delivery models. Elsewhere the data is remarkably complete:
+99.2\% of orders carry a review and product attributes are missing for under 2\%
+of products.
+
+Two decisions shape the window. The first four months are a pilot contributing 326
+orders against a 2018 run rate above 6{,}000 per month, and the final weeks are
+truncated mid-cycle, so we restrict the analysis to \textbf{2017-01-01 to
+2018-08-31}, leaving 99{,}091 orders (Figure~\ref{fig:coverage}).
+
+\subsection{Temporal patterns: growth, seasonality and drift}
+\label{sec:temporal}
+
+Monthly order volume roughly triples across the window, peaking at \textbf{Black
+Friday, November 2017} with 7{,}288 orders, about 1.5 times a typical month
+(Figure~\ref{fig:volume}a). Purchasing is weekday-heavy, peaks at 16:00, and is
+22\% weekend (Figure~\ref{fig:rhythm}).
+
+The most consequential temporal finding is not seasonality but \textbf{drift}.
+Mean lead time falls from 16.9 days in February 2018 to 7.7 in August 2018 --
+Olist materially improved fulfilment over twenty months
+(Figure~\ref{fig:volume}b) -- and across the chronological split used later the
+mean falls by \textbf{5.34 days} between training and test.
+
+Lateness behaves differently: it is \textbf{volatile rather than trending},
+swinging from 1.4\% (June 2018) to 21.4\% (March 2018). Those spikes align with
+Black Friday congestion and the nationwide truckers' strike that paralysed
+Brazilian road freight in May 2018 -- exogenous shocks no order-level feature
+available at checkout can anticipate.
+
+Together these facts set the evaluation strategy. Under a level shift this size,
+$R^2$ against a baseline fitted on the past is negative even for a genuinely
+useful model, so we report \textbf{mean absolute error} as the headline regression
+metric \citep{hyndman2006accuracy}, and treat periodic refitting as a Phase 2
+requirement rather than an optimisation \citep{gama2014drift}.
+
+\subsection{Customers, sellers, products and geography}
+
+The marketplace is geographically \textbf{lopsided}, and that asymmetry drives the
+delivery problem: \textbf{59.7\%} of sellers sit in S\~{a}o Paulo state against
+\textbf{42.0\%} of customers, only 35.7\% of orders stay within the customer's own
+state, and the median customer--seller distance is \textbf{434\,km}
+(Figure~\ref{fig:geography}). Distance is the strongest checkout-time correlate of
+lead time ($r = 0.40$), ahead of the platform's own estimate ($r = 0.38$).
+
+Demand is long-tailed across 74 categories, the top ten covering two-thirds of
+orders. The typical order is small -- median item value R\$86.90 -- but
+\textbf{freight is not a rounding error}, a median R\$17.17 or 22\% of item value.
+Payment is characteristically Brazilian: 75.4\% credit card, 51.4\% in instalments
+(Figure~\ref{fig:products}).
+
+\subsection{Reviews, and the relationship that dominates}
+\label{sec:reviews}
+
+Review scores are severely imbalanced -- \textbf{77.1\%} are four or five stars --
+exactly the imbalance the brief warns about. The interesting structure is what
+produces the minority.
+
+A late delivery raises the probability of a 1--2 star review from \textbf{9.2\%}
+to \textbf{54.0\%}, a \textbf{5.9-fold} increase, monotone in how late the parcel
+is (Figure~\ref{fig:reviews}). This is the clearest relationship in the dataset,
+and it reproduces at order level the logistics--rating link
+\citet{deshpande2023logistics} establish across 15 million orders -- where it
+carries through to seller sales. It also has a methodological consequence: a model
+predicting review score \emph{at checkout} cannot see the variable that matters
+most.
+
+\subsection{Candidate problem exploration}
+\label{sec:candidates}
+
+We examined three candidates. All probes use \code{scikit-learn} pipelines on a
+chronological split (train to 2018-04-30, validation to 2018-06-30, test
+thereafter) additionally \textbf{grouped on \code{customer\_unique\_id}}, removing
+the 227 buyers who would otherwise appear on both sides.\footnote{\textbf{Note on splitting.} We split by time rather than by
+stratified random sampling because the target drifts (Section~\ref{sec:temporal})
+and a random split lets a model learn from the future. Chronology alone is
+insufficient though: 2{,}997 people placed more than one order, so a temporal cut
+can still put one of a person's orders in training and another in test. This is
+the concrete form of the brief's \code{customer\_id} versus
+\code{customer\_unique\_id} warning, and why we also report a test subset of
+customers never seen in training.}
+
+\paragraph{Leakage depends on when the model runs.}
+Rather than one global rule we define a forbidden set per \textbf{prediction
+moment}. \emph{At checkout} nothing about fulfilment or the customer's opinion
+exists: delivery dates, review scores and even \code{order\_approved\_at} are
+future. \emph{At delivery} the parcel has arrived and we are predicting a review
+not yet written, so the delivery outcome is history and admissible -- the brief
+itself lists ``delivery performance'' among the features for this problem. The
+guard \code{assert\_no\_leakage(features, regime)} enforces the right set, and
+every modelling cell must pass it.
+
+The cost of getting this wrong is measurable: adding one forbidden column, the
+realised delivery time, lifts the late-delivery model's ROC-AUC from \textbf{0.589
+to 1.000} (Figure~\ref{fig:leakage}). That is not a result; it is the target
+restated.
+
+\paragraph{Candidate 1 --- delivery performance, framed twice (primary).}
+One question answered as a regression on lead time and a classification of late
+versus on-time, satisfying the brief's requirement for both task types from one
+coherent problem. Stakeholder: operations.
+
+The regression works. Gradient boosting reaches \textbf{MAE 3.89 days} against
+6.65 for a constant fitted on the training period, a \textbf{41.5\%} reduction,
+with ridge at 4.61 days in between. Plain least squares, the simpler starting
+point, is unusable here -- the design matrix is rank-deficient, so its
+coefficients explode -- and ridge at $\alpha = 1$ is the minimum regularisation
+that repairs it. Notably, Olist's own delivery promise is a
+\emph{worse} point forecast than the constant (MAE 9.79 days) -- expected rather
+than anomalous, since a promised date is a commercial decision, padded because a
+broken promise costs returns and retention \citep{cui2024promise}. A useful
+feature, not a useful prediction.
+
+The classification is weak, and Section~\ref{sec:temporal} explains why: balanced
+accuracy 0.580, PR-AUC 0.121 against a 0.074 floor. Crucially, \textbf{always
+predicting ``on time'' scores 0.926 accuracy} while catching not a single late
+order -- the exact trap the brief describes.
+
+\paragraph{Candidate 2 --- low review score, predicted at delivery (secondary).}
+The strongest classifier we found: PR-AUC \textbf{0.402} against a 0.110 floor
+(3.6$\times$), balanced accuracy \textbf{0.692} -- and identical on customers never
+seen in training (PR-AUC 0.403), so it is not memorising buyers. The prediction
+moment is what makes it work: the same target predicted \emph{at checkout} reaches
+only PR-AUC 0.212. Stakeholder: customer experience, with a concrete action --
+flag an at-risk order for outreach before the review lands.
+
+\paragraph{Candidate 3 --- repeat purchase within 30 days (rejected).}
+This fails twice over. The base rate is only 1.8\% -- 96.9\% of customers appear
+exactly once -- and the probe reaches balanced accuracy 0.517, essentially chance.
+Separately, \textbf{right-censoring destroys the evaluation}: at the more natural
+90-day horizon \emph{no} labelled orders remain in the test window at all, a
+structural limit of a 21-month extract that no better model repairs.
+Table~\ref{tab:checklist} scores all three.
+
+\subsection{Key insights}
+
+\begin{enumerate}\itemsep0pt\parsep0pt\topsep2pt
+\item Three of the nine tables are one-to-many against orders; a naive join
+inflates the data 19\% and biases every average towards large orders.
+\item \code{customer\_id} is an order key, not a person -- the difference between
+reporting 0\% and 3.1\% repeat buyers.
+\item Delivery performance \textbf{drifts}: lead time halves over the window, so
+MAE rather than $R^2$ is the honest regression metric.
+\item Lateness is \textbf{volatile, not predictable} (1.4--21.4\% monthly), which
+bounds the late-delivery classifier near 1.6$\times$ the no-skill floor.
+\item A late delivery raises the 1--2 star rate from 9.2\% to 54.0\%, the
+strongest relationship in the data.
+\item \textbf{The prediction moment is a design decision, not a detail}: it nearly
+doubles achievable PR-AUC one way, and inflates ROC-AUC to a meaningless 1.000 the
+other.
+\end{enumerate}
+
+We expect a tuned Candidate 2 classifier to reach balanced accuracy in the high
+60s, and Candidate 1's regression MAE of 3.5--4 days. The largest driver of both,
+month-to-month carrier conditions, is not observable at prediction time; a
+late-delivery classifier reporting 95\% accuracy would be the majority-class rule
+or the leaked variant above. The dashboard and repository are linked on the cover
+page; both read through the same \code{src/data\_load.py} entry point as this
+report, and \code{src/report\_stats.py} regenerates every number quoted here.

@@ -25,19 +25,22 @@ data/processed/
 # by the course.
 /broadway_clean.csv
 /phase 1 requirements.docx
+/phase 2 requirements.docx
+/phase1_req_dump.txt
 /NIBRS_DataDictionary.pdf
 /nibrs_diagram.pdf
 sample reports (for reference only)/
 
 # --- Report -----------------------------------------------------------------
-# Only the compiled PDF (Group10_Milestone1_Report.pdf) and its figures are
-# tracked. The LaTeX sources are kept
-# locally (and on Overleaf) but not in the repository, which is scoped to the
-# analysis code, the notebooks and the finished deliverable.
-report/*.tex
-report/sections/
-report/refs.bib
-report/stats.txt
+# Phase 1 kept the LaTeX sources out of the repository and tracked only the
+# compiled PDF. Phase 2 reverses that: report/ now holds the .tex, the section
+# files and refs.bib, so the whole folder uploads to Overleaf and compiles as-is,
+# and so the three of us can edit one copy rather than mail it around. The
+# generated stats files are tracked too - they are what the manuscript is diffed
+# against, and a reader should be able to check a number without running
+# anything.
+#
+# Build artefacts stay out.
 
 # LaTeX build artefacts
 report/*.aux

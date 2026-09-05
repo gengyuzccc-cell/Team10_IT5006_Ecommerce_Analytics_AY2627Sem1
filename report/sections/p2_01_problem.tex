@@ -1,0 +1,73 @@
+\section{Problem Definition and Stakeholder Context}
+\label{sec:problem}
+
+Phase 1 left one finding standing above the rest: a late delivery raises the
+probability of a 1--2 star review from 9.2\% to 54.0\%, a 5.9-fold increase
+monotone in how late the parcel is. Phase 2 turns that sentence into a pair of
+predictions placed at two points in an order's life.
+
+\begin{table}[htbp]
+\centering
+\caption{The two problems. They share one feature pipeline, one model-family
+budget and one dataset; what separates them is \emph{when} the model runs.}
+\label{tab:problems}
+\small
+\begin{tabular}{@{}p{1.9cm}p{6.2cm}p{6.2cm}@{}}
+\toprule
+ & \textbf{Problem 1 --- delivery performance} & \textbf{Problem 2 --- satisfaction risk} \\
+\midrule
+Question & How long will this order take, and will it miss its promise? &
+Will this delivered order draw a 1--2 star review? \\[2pt]
+Moment & \code{at\_checkout} --- the order has just been placed &
+\code{at\_delivery} --- the parcel has arrived, the review is not yet written \\[2pt]
+Stakeholder & Operations and logistics & Customer experience \\[2pt]
+Task & \textbf{1A regression}: lead time in days, on MAE.
+\textbf{1B classification}: delivered after the promised date, on PR-AUC against
+its no-skill floor &
+\textbf{Classification}: \code{review\_score} $\le 2$, on PR-AUC against its
+floor and balanced accuracy \\[2pt]
+Action & Re-quote the promise, warn the buyer, expedite freight &
+Reach out before the review lands \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The brief permits two problems or one framed twice; we take two, because they are
+halves of one decision chain. Operations acts before the parcel ships; customer
+experience acts after it arrives and before the customer writes anything.
+Problem 1's output is, in substance, Problem 2's most important input.
+
+Problem 1 is the brief's \emph{dual framing}: one underlying quantity, two
+outputs, so the late-order flag \emph{is} the regression's answer compared
+against the promised date. Five classifiers trained directly on the binary label
+run alongside as a control arm, testing whether the flag needs a model of its
+own; Section~\ref{sec:results-late} reports that comparison, including a
+disagreement between the selection protocol and the forward window that is itself
+one of this report's findings.
+
+\paragraph{Targets.} All three come from the provided tables alone.
+\emph{Lead time} is \code{order\_delivered\_customer\_date} $-$
+\code{order\_purchase\_timestamp} in days, defined for the 97.0\% of orders that
+reached the customer. \emph{Late} is delivery strictly after
+\code{order\_estimated\_delivery\_date}, which carries no time component, so
+lateness is accurate to about a day. \emph{Low review} is \code{review\_score}
+$\le 2$, defined for the 99.2\% carrying a review. Undefined rows are \code{NaN}
+and excluded, never imputed to a negative label: the event has not happened
+rather than gone missing, and a silent customer is not a satisfied one.
+
+\paragraph{Success criteria, registered in advance.}
+Expected ranges for all six headline metrics were written into
+\code{config.EXPECTED\_BANDS} \emph{before} any Phase 2 model was tuned, from the
+Phase 1 results and untuned scoping probes (Appendix~\ref{app:bands}). They are
+the targets the work is judged against and they are a leak alarm --- because here
+the signature of leakage is not a subtle improvement but an implausible one, as
+Phase 1 showed by adding one forbidden column to the late-delivery model and
+watching ROC-AUC go from 0.589 to 1.000. A result landing far \emph{above} its
+band is investigated before it is reported. All six landed inside; none above.
+
+The ceiling deserves stating as plainly as the target: lateness here is volatile
+rather than trending --- 1.4\% to 21.4\% month to month with Black Friday
+congestion and the May 2018 truckers' strike --- and no order-level feature
+available at checkout can anticipate a national road blockade. A late-delivery
+classifier reporting 95\% accuracy here would be the majority-class rule or a
+leak.
