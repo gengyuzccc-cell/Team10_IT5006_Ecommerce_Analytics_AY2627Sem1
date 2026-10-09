@@ -17,21 +17,46 @@ families need different encodings and one shared preprocessor would force a
 single choice on both. The full specification, search spaces and selected values
 are in Appendix~\ref{app:hyperparameters}.
 
+\paragraph{Why these rungs, from the literature rather than from our results.}
+The Milestone 1 feedback observed that Phase 1 cited the original algorithm
+papers and compared families only broadly, so the rungs are argued here before
+any result is shown. Within family B they are the three ways the literature
+knows to improve on one tree: a random forest bags decorrelated trees to cut
+variance \citep{breiman2001rf}; boosting fits trees to residuals with shrinkage
+to cut bias \citep{friedman2001gbm}. Across the large empirical comparisons --
+ten algorithms on eleven problems \citep{caruana2006empirical}, 179 classifiers
+on 121 datasets \citep{fernandezdelgado2014hundreds}, 45 tabular benchmarks
+against deep architectures \citep{grinsztajn2022tabular, shwartzziv2022tabular}
+and 41 classifiers on business credit data \citep{lessmann2015benchmarking} --
+boosted and bagged tree ensembles are the consistent top tier, boosting usually
+ahead by a small margin. The boosted learner is \code{HistGradientBoosting}
+rather than a third-party library because it is LightGBM's histogram-binned
+design \citep{ke2017lightgbm} implemented inside \code{scikit-learn}
+\citep{sklearn2024hgb}, so it stays within the brief's toolset; because it
+handles missing values natively, which the cold-start track-record features
+need; and because it fits an order of magnitude faster than a comparable
+forest, which made a 30-draw search affordable. In e-commerce and logistics the
+same family is the working choice -- quantile regression forests for delivery
+times at JD.com \citep{salari2022delivery}, tree models for late supplier
+deliveries \citep{baryannis2019risk}, and random forests or boosted trees in
+the published studies on this very dataset \citep{fouad2023satisfaction,
+wangkiat2023satisfaction, gopinadh2025satisfaction}, none of which controls
+leakage by prediction moment, the gap Section~\ref{sec:data} closes. The ladder
+then supplies what the literature cannot: on this data each rung must beat the
+one below it, and Section~\ref{sec:results} reports where it does not.
+
 Every model is a \code{scikit-learn} \code{Pipeline}: median imputation, one-hot
 encoding of the four categoricals with rare levels folded into one bucket, then
 --- for the linear family only --- standardisation, since trees are invariant to
-monotone rescaling and a shared penalty is not
-\citep{pedregosa2011sklearn}. The linear family additionally drops one level per
-categorical, which is a correction rather than a preference: Phase 1 reported
-that ordinary least squares was unusable here, ``rank-deficient, so its
-coefficients explode'', and re-running it four ways
-(Appendix~\ref{app:encoding}) reproduces the observation and corrects the
-conclusion. The deficiency is exactly four, one per categorical; least squares
-still returns a usable \emph{prediction} (test MAE 4.181, indistinguishable from
-Ridge) but a coefficient vector of order $10^{13}$ whose cancellation fails on
-one of five folds --- something a single train/test split would never have shown.
-Dropping a level restores full rank, and once it does, Ridge and OLS agree to
-three decimals. Regularisation buys numerical stability here, not accuracy.
+monotone rescaling and a shared penalty is not \citep{pedregosa2011sklearn}. The
+linear family additionally drops one level per categorical. That is a
+correction rather than a preference: Phase 1 reported that ordinary least
+squares was unusable here, ``rank-deficient, so its coefficients explode'', and
+re-running it four ways (Appendix~\ref{app:encoding}) shows the predictions were
+always fine (test MAE 4.181, indistinguishable from Ridge) and only the
+coefficient vector was not; dropping a level restores full rank, after which
+Ridge and OLS agree to three decimals. Regularisation buys numerical stability
+here, not accuracy.
 
 \subsection{Cross-validation, and how a model gets chosen}
 \label{sec:cv}
@@ -69,9 +94,11 @@ a contrast exhibit and never used to choose anything. The selected models are
 \emph{not} refitted on train plus validation before the test window is scored: a
 production system should, but that would decouple the shipped artifact from the
 threshold and calibration fitted against it, and what is reported here is exactly
-what is deployed.
+what is deployed. What the two cross-validation protocols would have reported,
+and why their raw PR-AUC is not comparable with the forward window, is
+quantified in Appendix~\ref{app:protocol}.
 
-\subsection{Imbalance, and reproducibility}
+\subsection{Imbalance, metrics aligned to the action, and reproducibility}
 \label{sec:imbalance}
 
 Both targets are imbalanced --- 7.4\% late and 11.0\% low review in the test
@@ -88,11 +115,25 @@ than a nicety, because Section~\ref{sec:cost} multiplies them by a cost
 \citep{elkan2001cost}; they are reported, not assumed
 \citep{niculescu2005calibration}. No resampling is used anywhere.
 
+A second alignment follows from Table~\ref{tab:levers}. PR-AUC summarises the
+whole ranking and is the right criterion for \emph{choosing} between models,
+but neither team acts on the whole ranking: customer experience contacts the
+$K$ riskiest deliveries its agents can reach in a day, and operations reviews
+the top of the late list. The quantity that describes their day is the precision
+and recall of that top-$K$ -- the targeting view of \citet{provost2013data},
+and the top-decile lift that profit-driven evaluation uses in place of accuracy
+\citep{verbeke2012churn, lessmann2015benchmarking}.
+Section~\ref{sec:results-capacity} therefore reports Precision@$K$ and
+Recall@$K$ for both flags, with $K$ as a share of the day's volume so that the
+same table holds on a quiet Tuesday and on Black Friday, and
+Section~\ref{sec:cost} chooses the operating point as a capacity rather than
+as a threshold.
+
 \code{SEED = 42} throughout. \code{src/train\_models.py} fits everything and
 writes the models, metadata and every result table; \code{src/phase2\_stats.py}
 distils those into \code{report/stats\_phase2.txt}, and no number enters this
 report that it cannot regenerate. Every figure is drawn from those same tables,
 so a figure cannot disagree with one. Artifacts record the \code{scikit-learn}
 version that wrote them and the loader checks it;
-\code{tests/test\_leakage.py} runs 32 validation checks
+\code{tests/test\_leakage.py} runs 41 validation checks
 (Appendix~\ref{app:repro}).

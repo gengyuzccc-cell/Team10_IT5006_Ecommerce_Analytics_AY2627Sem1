@@ -9,9 +9,6 @@ small sellers onto Brazil's large retail platforms and handles fulfilment, so ea
 order links a customer, one or more sellers, a basket, a payment, a delivery and
 usually a review -- a structure supporting all three question families the brief
 identifies: operational performance, customer experience and commercial outcomes.
-The review below covers what Phase 2 depends on: fulfilment and satisfaction,
-model families for tabular data, feature engineering on a relational order model,
-and metrics that survive severe imbalance.
 
 \subsection{Fulfilment, delivery promises and customer satisfaction}
 
@@ -52,8 +49,7 @@ distribution shift. Tree ensembles are the usual step up, whether by bagging
 decorrelated trees \citep{breiman2001rf} or fitting residuals stagewise with
 shrinkage \citep{friedman2001gbm, chen2016xgboost}. \citet{grinsztajn2022tabular}
 benchmark both against modern deep architectures across 45 datasets and find
-tree-based methods remain state of the art at this scale, the gap owing to
-inductive biases better matched to irregular tabular targets.
+tree-based methods remain state of the art at this scale.
 
 We therefore adopt a small model budget: one linear family (ridge and
 $\ell_2$-regularised logistic regression) and one tree ensemble (histogram-based
@@ -63,11 +59,11 @@ lead time, while on repeat purchase neither family beats the baseline.
 
 \subsection{Feature engineering on a relational order model}
 
-Deriving features from nine tables raises a problem a flat file does not. Three of
-them -- items, payments and reviews -- are one-to-many against orders, so a naive
-join multiplies rows and reweights every aggregate towards multi-item orders. The
-remedy is to aggregate each child relation to the analysis grain before joining.
-Beyond that the usual transactional vocabulary applies: basket counts and sums,
+Deriving features from nine tables raises a problem a flat file does not: three
+of them -- items, payments and reviews -- are one-to-many against orders, so a
+naive join multiplies rows and reweights every aggregate towards multi-item
+orders, and each child relation must be aggregated to the analysis grain before
+joining. Beyond that the usual transactional vocabulary applies: basket counts and sums,
 ratios that normalise for order size, calendar encodings, and geographic distance
 from postcode centroids. High-cardinality categoricals such as the 74 product
 categories suit target encoding \citep{miccibarreca2001target} better than
@@ -127,10 +123,10 @@ scale. And the methodological literature is emphatic -- increasingly so -- that 
 imbalanced, temporally ordered data the choice of split, metric and imbalance
 handling decides whether a number means anything at all.
 
-The gap we address is narrow but concrete. Most work on this marketplace is
-descriptive, or predicts review scores from features that would not exist when the
-prediction is needed. Little of it is explicit about \emph{when} a model would run
--- a choice that changes both what is admissible and what is achievable, by a
-factor of two in our own results. Making the prediction moment a first-class
-design decision, and measuring its cost, is the contribution of
+The gap we address is narrow but concrete: most work on this marketplace is
+descriptive, or predicts review scores from features that would not exist when
+the prediction is needed, and little of it is explicit about \emph{when} a model
+would run -- a choice that changes both what is admissible and what is
+achievable, by a factor of two in our own results. Making the prediction moment
+a first-class design decision, and measuring its cost, is the contribution of
 Section~\ref{sec:candidates}.

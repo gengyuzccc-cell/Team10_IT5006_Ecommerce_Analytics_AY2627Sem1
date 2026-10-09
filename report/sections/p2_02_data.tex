@@ -45,6 +45,31 @@ rate, low-review rate and order count; a route's mean lead time; a category's
 low-review rate; and the platform's own lead time and late rate. The at-delivery
 regime additionally sees three columns describing how delivery actually went.
 
+\paragraph{Why these features.}
+Phase 1 chose the feature groups from the structure of the data; the Milestone 1
+feedback asked for the literature behind them. \emph{Geography:}
+origin--destination structure and distance are the backbone of published
+delivery-time models, from JD.com's arrival forecasts \citep{salari2022delivery}
+to last-mile travel-time predictors \citep{liu2021lastmile}. \emph{The promise:}
+the quoted date is itself a decision that encodes what the platform's routing
+knew \citep{cui2024promise, salari2022delivery}, which is why it is admissible
+and useful at checkout. \emph{Basket, money and calendar:} order size, value and
+freight are the order-level controls through which \citet{deshpande2023logistics}
+identify the logistics--rating link, and demand peaks stress fulfilment
+\citep{cui2024promise}, which Section~\ref{sec:problem} measures for Black
+Friday. \emph{Track records:} the past performance of the parties to a
+transaction is the standard predictor in supply-chain delay models
+\citep{baryannis2019risk}, and an as-of aggregate of a key's earlier outcomes is
+the time-respecting form of target encoding \citep{miccibarreca2001target}; the
+general vocabulary of counts, ratios and calendar encodings follows
+\citet{kuhn2019feature} and \citet{heaton2016feature}. The empirical screen was
+Phase 1's correlation matrix (its Figure~8): lead time correlates 0.39 with
+distance, 0.38 with the promised window, 0.17 with freight and 0.07 with weight;
+promise and distance correlate 0.52 with each other, so both are kept and the
+trees resolve the overlap; and the review score correlates $-0.33$ with lead
+time and essentially zero with price or basket size -- the delivery, not the
+purchase, drives the rating.
+
 \subsection{Track records, and the trap inside them}
 \label{sec:history}
 

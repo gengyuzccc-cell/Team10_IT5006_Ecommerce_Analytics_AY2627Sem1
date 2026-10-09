@@ -45,15 +45,64 @@ own; Section~\ref{sec:results-late} reports that comparison, including a
 disagreement between the selection protocol and the forward window that is itself
 one of this report's findings.
 
+\paragraph{How the stakeholders act on the output.}
+A prediction is only worth producing if someone changes a decision because of
+it, and the Milestone 1 feedback asked what the operations team would actually
+\emph{do} with a lead-time estimate. Table~\ref{tab:levers} answers for both
+teams, and shapes the evaluation: the cheap operations levers apply to every
+order and are judged on the regression's accuracy; the expensive one, and all
+of customer experience's work, are rationed by capacity and are judged on what
+the top-$K$ of a ranked list delivers (Section~\ref{sec:results-capacity}).
+
+\begin{table}[htbp]
+\centering
+\caption{What each team does with the predictions, and what decides whether
+the action pays. Costs are the stated assumptions of Section~\ref{sec:cost}.}
+\label{tab:levers}
+\small
+\begin{tabular}{@{}p{2.0cm}p{3.6cm}p{1.35cm}p{6.9cm}@{}}
+\toprule
+\textbf{Who, when} & \textbf{Lever} & \textbf{Cost} & \textbf{Trigger, and the evidence behind it} \\
+\midrule
+Operations, at checkout & Re-quote the promised date with the model's estimate & none & every order; MAE 3.90 days against the promise's 9.79 (Section~\ref{sec:results-reg}) \\[2pt]
+ & Pre-warn the buyer & near zero & $p_{\text{late}} \ge 0.11$ catches 82.6\% of the orders that will miss \\[2pt]
+ & Expedite freight & R\$12 & only where precision clears 0.30, which it never does (Section~\ref{sec:results-capacity}); manual review of the top of the list \\[2pt]
+ & Monitor sellers, routes, carrier & analyst time & track-record features and the weekly late series (Figure~\ref{fig:lateness}) as early warning \\[2pt]
+\midrule
+Customer experience, at delivery & Contact the customer before the review is written & R\$5 & the day's deliveries ranked by $p_{\text{low}}$, worked top-down to capacity $K$; at 5\% of deliveries, two contacts in three reach a would-be 1--2 star reviewer \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \paragraph{Targets.} All three come from the provided tables alone.
-\emph{Lead time} is \code{order\_delivered\_customer\_date} $-$
-\code{order\_purchase\_timestamp} in days, defined for the 97.0\% of orders that
-reached the customer. \emph{Late} is delivery strictly after
+\emph{Lead time} is the time from \code{order\_purchase\_timestamp} to
+\code{order\_delivered\_customer\_date}, in days, defined for the 97.0\% of
+orders that reached the customer. \emph{Late} is delivery strictly after
 \code{order\_estimated\_delivery\_date}, which carries no time component, so
 lateness is accurate to about a day. \emph{Low review} is \code{review\_score}
 $\le 2$, defined for the 99.2\% carrying a review. Undefined rows are \code{NaN}
 and excluded, never imputed to a negative label: the event has not happened
 rather than gone missing, and a silent customer is not a satisfied one.
+
+\paragraph{What the review score measures, and what it does not.}
+Phase 1's review treated the service-quality literature's \emph{perceived
+quality} and a platform rating as one construct; they are not. Perceived
+service quality is measured by survey instruments such as E-S-QUAL
+\citep{parasuraman2005esqual} and e-LSQ \citep{rao2011elsq}: self-reported,
+retrospective, subject to recall bias. A star rating is a behavioural trace
+left by the customers who choose to write one, and the J-shaped distribution of
+ratings -- 57.8\% five stars here, with a second mode at one star -- is the
+signature of acquisition and under-reporting biases: satisfied buyers
+self-select into purchasing, and only strongly moved customers into reviewing
+\citep{hu2009jshaped, hu2017selfselection}. A rating also moves with the
+product, its price and the seller's communication
+\citep{dellarocas2003digitization}. The bridge Phase 1 lacked is
+\citet{deshpande2023logistics}, who show on transactional data rather than
+surveys that logistics performance moves the platform rating itself. Problem 2
+therefore predicts the \emph{rating}, the observable the customer-experience
+team is measured on, and claims nothing about latent satisfaction; the
+consequence, that part of the residual is unobserved product and seller
+effects, is carried into Section~\ref{sec:limitations}.
 
 \paragraph{Success criteria, registered in advance.}
 Expected ranges for all six headline metrics were written into
@@ -65,9 +114,20 @@ Phase 1 showed by adding one forbidden column to the late-delivery model and
 watching ROC-AUC go from 0.589 to 1.000. A result landing far \emph{above} its
 band is investigated before it is reported. All six landed inside; none above.
 
-The ceiling deserves stating as plainly as the target: lateness here is volatile
-rather than trending --- 1.4\% to 21.4\% month to month with Black Friday
-congestion and the May 2018 truckers' strike --- and no order-level feature
-available at checkout can anticipate a national road blockade. A late-delivery
-classifier reporting 95\% accuracy here would be the majority-class rule or a
-leak.
+The ceiling deserves stating as plainly as the target. Lateness here is volatile
+rather than trending, 1.4\% to 21.4\% month to month, and Phase 2 re-examined
+where that volatility comes from after the Milestone 1 feedback found the
+Phase 1 attribution unsupported (Appendix~\ref{app:lateness},
+Figure~\ref{fig:lateness}). Black Friday 2017 is a genuine spike (14.3\%). The
+largest peaks, February and March 2018 (16.0\% and 21.4\%), are a network-wide
+carrier-side slowdown -- transit from carrier handoff to doorstep lengthened
+from 8.7 to 13.2 days while sellers' handling time did not move -- that
+coincided with the platform \emph{tightening} its promised window by about four
+days. The truckers' strike of 21 May to 1 June 2018 \citep{bloomberg2018strike,
+tecnoblog2018correios} is real but invisible at monthly resolution: orders
+placed the week before it and caught in transit were 16.0\% late, and the
+platform then lengthened its promise from 19.5 to 36.8 days, which is why June
+2018 is the quietest month in the series. None of these shocks is an attribute
+of an order, so nothing available at checkout can anticipate them. A
+late-delivery classifier reporting 95\% accuracy here would be the
+majority-class rule or a leak.

@@ -13,11 +13,17 @@ to run it in. The fitting step dominates; the rest takes under two minutes.}
 \midrule
 \code{pip install -r requirements-dev.txt} & The full analysis environment.
 \code{requirements.txt} alone is the deployment runtime \\[3pt]
-\code{python tests/test\_leakage.py} & 32 validation checks: join grain, the
+\code{python tests/test\_leakage.py} & 41 validation checks: join grain, the
 history construction against a brute-force recomputation, the leakage guard in
-both directions, split disjointness, Phase 1 backward compatibility \\[3pt]
+both directions, split disjointness, Phase 1 backward compatibility, and the
+capacity and lateness tables against recomputation \\[3pt]
 \code{python src/train\_models.py} & Fits every model, scores the test window
 once, writes \code{models/} and every result table into \code{report/results/} \\[3pt]
+\code{python src/capacity\_metrics.py} & Precision@$K$ and Recall@$K$ from the
+saved per-order test predictions, for Section~\ref{sec:results-capacity};
+nothing is refitted \\[3pt]
+\code{python src/lateness\_anatomy.py} & The weekly, monthly and strike-cohort
+lateness tables of Appendix~\ref{app:lateness} \\[3pt]
 \code{python src/figures\_phase2.py} & Draws every figure as vector PDF into
 \code{report/figures/} from those tables \\[3pt]
 \code{python src/phase2\_stats.py} & Distils every number quoted in this report
@@ -50,7 +56,7 @@ leaks through.
 
 \begin{center}
 \small
-\begin{tabular}{@{}llll@{}}
+\begin{tabular}{@{}lllp{6.3cm}@{}}
 \toprule
 \textbf{Problem} & \textbf{Metric} & \textbf{Registered band} & \textbf{Where the range came from} \\
 \midrule
@@ -68,7 +74,7 @@ leaks through.
 \label{app:hyperparameters}
 
 \begin{center}
-\small
+\footnotesize
 \begin{tabular}{@{}llll@{}}
 \toprule
 \textbf{Family} & \textbf{Rung} & \textbf{Classification} & \textbf{Regression} \\
@@ -99,7 +105,7 @@ one.
 and are reproduced in \code{models/model\_metadata.json}.}
 \label{tab:spaces}
 \small
-\begin{tabular}{@{}llp{9.4cm}@{}}
+\begin{tabular}{@{}llp{7.1cm}@{}}
 \toprule
 \textbf{Model} & \textbf{Draws} & \textbf{Distributions} \\
 \midrule
@@ -199,7 +205,7 @@ written by \code{src/train\_models.py} to \code{report/results/}:
 
 \begin{center}
 \small
-\begin{tabular}{@{}ll@{}}
+\begin{tabular}{@{}lp{7.8cm}@{}}
 \toprule
 \textbf{File} & \textbf{Contents} \\
 \midrule
@@ -215,9 +221,160 @@ written by \code{src/train\_models.py} to \code{report/results/}:
 \code{segments\_*.csv} & Performance by region, category and test month \\
 \code{predictions\_*.csv} & Per-order test predictions, from which the figures are drawn \\
 \code{bands.csv} & Headline metrics against the bands registered in advance \\
+\code{capacity\_*.csv} & Precision@$K$ and Recall@$K$, pooled and per day, for both flags; \code{capacity\_operating\_points.csv} places the threshold operating points on the same axis \\
+\code{lateness\_*.csv} & The lateness anatomy of Appendix~\ref{app:lateness}: monthly, weekly, the strike cohorts and the February--March 2018 peak \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\section{The cross-validation protocol exhibit}
+\label{app:protocol}
+
+\begin{table}[htbp]
+\centering
+\caption{One model, three protocols. Raw average precision disagrees; the same
+numbers divided by each period's no-skill floor do not.
+Figure~\ref{fig:protocol}.}
+\label{tab:protocol}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Protocol} & \textbf{PR-AUC} & \textbf{fold spread} & \textbf{no-skill floor} & \textbf{lift} \\
+\midrule
+\code{TimeSeriesSplit}, expanding window & 0.562 & $\pm$0.091 & 0.158 & 3.55$\times$ \\
+\code{StratifiedGroupKFold}, shuffled    & 0.580 & $\pm$0.006 & 0.158 & 3.66$\times$ \\
+Forward test window --- the truth        & 0.414 & ---        & 0.110 & 3.75$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Both cross-validated estimates sit about 0.16 above the forward result, which
+looks like catastrophic optimism --- and almost all of it is mechanical. Average
+precision's no-skill baseline \emph{is} the positive rate
+\citep{saito2015prplot}, and the low-review rate falls from 15.8\% inside the
+training period to 11.0\% in the test window; normalised by that floor the three
+agree to within 0.2 of a multiple. \textbf{Raw PR-AUC is not comparable across
+periods with different base rates; its lift over the floor is} --- and quoting
+the raw number alone would have supported either a claim of severe overfitting or
+a claim of none. The shuffled protocol adds a second warning: its fold-to-fold
+spread is $\pm$0.006 against the temporal protocol's $\pm$0.091, an interval
+fifteen times narrower on an estimate no closer to the truth.
+
+\section{Lateness anatomy: where the late deliveries came from}
+\label{app:lateness}
+
+Phase 1 read the monthly late-rate series and attributed its spikes to Black
+Friday and to the May 2018 truckers' strike. The Milestone 1 feedback pointed
+out that the figure does not support the second claim -- the largest peaks are
+February and March 2018, and May is unremarkable -- and asked for a source and a
+more careful link. \code{src/lateness\_anatomy.py} is that analysis, at three
+resolutions, and Figure~\ref{fig:lateness} draws it.
+
+\paragraph{Weekly, not monthly.} A ten-day event cannot be resolved by a
+monthly series. In Monday-to-Sunday purchase weeks the strike of 21 May to
+1 June 2018 \citep{bloomberg2018strike} -- nationwide road blockades, during
+which Correios suspended its time-definite Sedex services and added five
+business days to standard parcels \citep{tecnoblog2018correios} -- is plainly
+visible, but one week \emph{earlier} than a naive reading expects: orders placed
+on 14--20 May were promised 19.5 days under normal conditions and were in
+transit when the roads closed, and 16.0\% of them arrived late against a 5.0\%
+average over the preceding five weeks. Of all orders in transit during the
+strike (4{,}228), 16.9\% were late, against 0.4\% for the May orders delivered
+before it (Table~\ref{tab:strike}). What the monthly series records instead is
+the platform's reaction: order volume in the strike week halved, the promised
+window for orders placed that week rose to 25.3 days and in the following week
+to 36.8, and the late rate of those orders was 5.5\% and 0.4\%. That is why June
+2018, at 1.4\%, is the quietest month in the data.
+
+\paragraph{February--March 2018 is a different mechanism.} Panel (b) of
+Figure~\ref{fig:lateness} splits lead time at the carrier handoff. Outside the
+peak, sellers hand parcels to the carrier in about 3.2 days and the carrier
+takes 8.7 more; in February--March 2018 the seller's share was unchanged at
+3.4 days while the carrier's rose to 13.2, in every customer region. At the
+same time the promised window was \emph{tightened}, from 26.3 days in January
+to 22.0 in March -- within the S\~{a}o Paulo to S\~{a}o Paulo route alone, from
+20.1 to 15.2 days -- so the slack that normally absorbs a slow fortnight was
+removed exactly when it was needed. The late rate peaked at 29.0\% in the week
+of 26 February, the promise was lengthened again from the week of 9 April, and
+by that week the late rate was back under 5\%. The data do not identify the
+external cause of the carrier slowdown and we do not assert one; what they do
+establish is that it was carrier-side, network-wide and compounded by a
+promising decision, which is the careful form of the claim Phase 1 made
+loosely.
+
+\begin{table}[htbp]
+\centering
+\caption{The cohorts around the strike, from
+\code{report/results/lateness\_strike.csv}. Carrier days run from the carrier
+handoff to the doorstep; the promise is the window quoted at checkout.}
+\label{tab:strike}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Cohort} & \textbf{orders} & \textbf{late} & \textbf{carrier days} & \textbf{promise, days} \\
+\midrule
+Bought 1--20 May, delivered before the strike & 2{,}749 & 0.4\%  & 4.8  & 19.5 \\
+In transit during the strike                  & 4{,}228 & 16.9\% & 13.1 & 25.5 \\
+Bought during the strike, 21 May--1 June      & 1{,}502 & 3.5\%  & 9.2  & 29.4 \\
+Bought 2--30 June                             & 5{,}912 & 1.4\%  & 6.7  & 27.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Changes made in response to the Milestone 1 feedback}
+\label{app:feedback}
+
+\begin{table}[htbp]
+\centering
+\caption{Each point of the Milestone 1 feedback, and where this report acts on
+it.}
+\label{tab:feedback}
+\small
+\begin{tabular}{@{}p{4.4cm}p{10.1cm}@{}}
+\toprule
+\textbf{Feedback} & \textbf{Response} \\
+\midrule
+Survey-based perceived quality and platform ratings were treated as one construct &
+Section~\ref{sec:problem} separates them, cites the self-selection literature
+\citep{hu2009jshaped, hu2017selfselection, dellarocas2003digitization}, and
+defines the target as the platform rating; Section~\ref{sec:limitations}
+carries the consequence \\[2pt]
+Model choices cited original algorithm papers rather than e-commerce
+applications; no comparison within the tree family; HistGradientBoosting not
+justified &
+Section~\ref{sec:method} argues the rungs from the empirical comparisons and
+from e-commerce applications, including three studies on this dataset, and
+states why HistGradientBoosting; the ladder results in Section~\ref{sec:results}
+are the within-family comparison \\[2pt]
+Features not supported by literature &
+Section~\ref{sec:data} cites the support for each feature group and uses
+Phase 1's correlation matrix as the empirical screen \\[2pt]
+Problem 2 should be evaluated under limited capacity, with Precision@$K$ and
+Recall@$K$ &
+Section~\ref{sec:results-capacity}, Table~\ref{tab:capacity} and
+Figure~\ref{fig:capacity}; the operating point in Section~\ref{sec:cost} is now
+a capacity; the dashboard's batch scorer returns a top-$K$ triage list \\[2pt]
+Figure 3 attributed the late-rate peaks to the May 2018 strike; the strike
+needed a source &
+Appendix~\ref{app:lateness} and Figure~\ref{fig:lateness}: the peaks are
+February--March 2018; the strike is cited \citep{bloomberg2018strike,
+tecnoblog2018correios}, shown at weekly resolution, and its effect traced
+through the promised window; Sections~\ref{sec:problem} and
+\ref{sec:limitations} corrected accordingly \\[2pt]
+Figure 5a omitted S\~{a}o Paulo; ``roughly triples''; Figure 8 not referenced &
+Corrected in the revised Phase 1 report in the repository: the figure had taken
+the first eight states alphabetically; growth is about eight-fold; the
+correlation matrix is now discussed there and reused in Section~\ref{sec:data} \\[2pt]
+Candidate 1 named a stakeholder without saying how the team would use the
+prediction &
+Table~\ref{tab:levers} and Section~\ref{sec:insight}: four levers ordered by
+cost, each with its trigger and the evidence behind it \\[2pt]
+Dashboard inaccessible &
+Redeployed from the team's new repository under a new URL (cover page);
+Appendix~\ref{app:deployment} explains how it stays reachable \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Deployment}
 \label{app:deployment}
@@ -235,11 +392,22 @@ pushed through the same \code{features.py} builders the models were fitted on,
 which is what stops a feature being computed one way in training and another way
 in production. The one thing a form cannot supply is a seller's track record, so
 \code{models/history\_lookup.csv} carries those aggregates at each level of the
-same fallback chain \code{add\_history()} uses.
+same fallback chain \code{add\_history()} uses. After the Milestone 1 feedback
+the batch scorer also returns a \textbf{triage list}: the uploaded orders ranked
+by review risk, the top-$K$ marked for a capacity the user enters, and the
+precision and recall that capacity achieved on the test window shown beside it
+(Section~\ref{sec:results-capacity}).
 
 \textbf{Model card} reports the training window, the selected models and their
-hyperparameters, the test metrics, the decision thresholds, and an explicit list
-of situations in which the models should not be trusted.
+hyperparameters, the test metrics, the decision thresholds, the Precision@$K$
+table, and an explicit list of situations in which the models should not be
+trusted.
+
+\textbf{Staying reachable.} The Milestone 1 dashboard became inaccessible when
+the GitHub account it was deployed from was suspended; the app now deploys from
+the team's new repository, linked on the cover. A Community Cloud app that has
+had no visitors for twelve hours goes to sleep and shows a wake-up button; any
+visitor can press it, and the app is back in about a minute.
 
 Engineering constraints are recorded rather than discovered later. The deployed
 estimators are the histogram-boosted variants, whose pickles are a few hundred

@@ -26,7 +26,7 @@ Legend: **§** = section of `report/Team10_Phase2_IT5006_AY2627Sem1.pdf`.
 | Baseline: simplest variant in each family first | Rung 0 of each ladder; every rung above compared against it. §3.1, §4.1, §4.3 |
 | Every more complex model shown to beat its baseline | Ladder tables report the delta at each rung. §4.1, §4.3 |
 | Train–test discipline, no leakage | Three-period chronological split, customer-disjoint (§2.1, Table 2); guard §2.4 |
-| Model selection compared systematically, choice explained | Rank-averaged over the three most recent out-of-sample windows; the rule and the two alternatives it replaced are argued in §3.3, applied in §4.1–§4.3, and its one failure reported in §4.2 |
+| Model selection compared systematically, choice explained | Rank-averaged over the three most recent out-of-sample windows; the rule and the two alternatives it replaced are argued in §3.2, applied in §4.1–§4.3, and its one failure reported in §4.2; the rungs themselves are argued from the literature in §3.1 (added after the Milestone 1 feedback) |
 | Cross-validation for robust estimates and tuning | `TimeSeriesSplit(5)` inside train for every hyperparameter search. §3.3 |
 | Reproducibility: seeds, preprocessing in pipelines | `SEED = 42` throughout; all preprocessing inside `sklearn.Pipeline`. §3.2, §3.5, Appendix A |
 
@@ -39,14 +39,15 @@ Legend: **§** = section of `report/Team10_Phase2_IT5006_AY2627Sem1.pdf`.
 | Feature engineering strategy | §2.2, §2.3 (track-record features) |
 | Model descriptions and training process | §3.1, §3.2 |
 | Hyperparameter tuning methodology | §3.3, Appendix C (search spaces and selected values) |
-| Classification metrics: Precision, Recall, F1, AUC-ROC / PR-AUC | §4.2, §4.3 — all reported, PR-AUC always against its no-skill floor, accuracy always beside the majority-class rule |
+| Classification metrics: Precision, Recall, F1, AUC-ROC / PR-AUC | §4.2, §4.3 — all reported in Tables 4 and 5 (precision and recall columns added after the Milestone 1 feedback), PR-AUC always against its no-skill floor, accuracy beside the majority-class rule; §4.4 adds Precision@K / Recall@K for the capacity-constrained action |
 | Regression metrics: MAE, RMSE, R² | §4.1 — all three, with MAE leading and R² read as a drift diagnostic |
-| Cross-validation results | Every results table carries the CV column beside validation and test; §4.4 quantifies what the protocol was telling us |
+| Cross-validation results | Every results table carries the CV column beside validation and test; Appendix F quantifies what the protocol was telling us |
 | Feature importance / interpretability | §5.1 — permutation importance on the test window, both problems, with the correlated-predictor caveat stated |
 | Model comparison and final selection with justification | §3.3 (the rule), §4.1, §4.2, §4.3 |
 | Ensemble or stacking results | §4.5 — Voting and Stacking from families A + B; earns its place on 1A, does not on 2, both reported |
-| Actionable insights for the stakeholder | §5.2, §5.3 — decision policy, expected volumes, cost sensitivity, per-stakeholder actions |
+| Actionable insights for the stakeholder | Table 2 (the levers each team pulls, with trigger and cost), §5.2, §5.3 — decision policy, capacity-based operating point, cost sensitivity, per-stakeholder actions |
 | Discussion of limitations and constraints | §6, and the honest protocol failure in §4.2 |
+| Response to the Milestone 1 feedback | Appendix I maps each feedback point to the section that acts on it; Appendix G is the corrected lateness analysis with the strike cited |
 
 ## Submission format
 
@@ -63,7 +64,7 @@ Legend: **§** = section of `report/Team10_Phase2_IT5006_AY2627Sem1.pdf`.
 |---|---|
 | Problem framing and scoping | Two problems at two prediction moments forming one operational chain; scoping checklist closed out in notebook 05 |
 | Data preparation and feature engineering, incl. leakage avoidance | Regime-specific leakage guard; the as-of history construction verified against a brute-force recomputation (`tests/test_leakage.py`) |
-| Modelling discipline | Three periods with one job each; test scored once; seeds and pipelines throughout; 26 automated validation checks |
+| Modelling discipline | Three periods with one job each; test scored once; seeds and pipelines throughout; 41 automated validation checks |
 | Quality of model family comparison | Three families as complexity ladders, each rung compared on the same protocol, with the honest finding that regularisation buys nothing here |
 | Evaluation rigor | PR-AUC against its floor, majority accuracy printed beside accuracy, calibration reported, CV-protocol contrast quantified |
 | Ensemble / stacking justified and explained | §4.5, including the inner-CV compromise stacking forces and what it means for the conclusion |
@@ -76,7 +77,7 @@ Legend: **§** = section of `report/Team10_Phase2_IT5006_AY2627Sem1.pdf`.
 | Python: pandas, scikit-learn, matplotlib/seaborn, numpy | `requirements.txt`, `requirements-dev.txt` |
 | Dashboard: Streamlit | `dashboard/app.py` — seven tabs |
 | Deployment: Streamlit Cloud | https://it5006-group-project-10.streamlit.app |
-| Version control: GitHub | https://github.com/gengyuzhu/Team10_IT5006_Ecommerce_Analytics_AY2627Sem1 |
+| Version control: GitHub | https://github.com/gengyuzccc-cell/Team10_IT5006_Ecommerce_Analytics_AY2627Sem1 (the Milestone 1 account was suspended; everything was re-pushed here) |
 | Documentation: Jupyter notebooks with markdown | `notebooks/05–09`, executed with outputs |
 
 ## Modelling guidelines
@@ -98,7 +99,7 @@ Legend: **§** = section of `report/Team10_Phase2_IT5006_AY2627Sem1.pdf`.
 |---|---|
 | Clean, well-commented code, meaningful names | `src/` modules carry the reasoning for each decision, not just its implementation |
 | Reproducible, seeds set | `SEED = 42`; `src/phase2_stats.py` regenerates every reported number |
-| Error handling and data validation | `tests/test_leakage.py` (32 checks); row-count assertions on load; typed errors in the dashboard |
+| Error handling and data validation | `tests/test_leakage.py` (41 checks); row-count assertions on load; typed errors in the dashboard |
 | Separation of preparation, modelling, evaluation, deployment | `data_load.py` / `features.py` → `modeling.py` → `evaluate.py` → `dashboard/predict.py` |
 | All code in GitHub with descriptive commits | See the repository history |
 | Comprehensive README | `README.md` — setup, execution, results, deployment notes |
@@ -121,7 +122,7 @@ Legend: **§** = section of `report/Team10_Phase2_IT5006_AY2627Sem1.pdf`.
 | Clear usage instructions | Sidebar guide; form defaults; downloadable CSV template |
 | Document any API endpoints with examples | No API endpoints — the proof of concept is the Streamlit app. The batch CSV contract is documented in the Predict tab and in Appendix E |
 | No hardcoded credentials | None anywhere; nothing in the app reads a secret |
-| Test deployment before submission | Local run plus the deployed URL exercised across all seven tabs |
+| Test deployment before submission | Local run plus the deployed URL exercised across all seven tabs, including the batch scorer's triage list; the app is opened once before each grading window because Community Cloud sleeps it after twelve idle hours |
 
 ---
 

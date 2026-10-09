@@ -61,8 +61,12 @@
 {\large Predicting Delivery Performance and Customer Satisfaction\par}
 \vspace{0.4em}
 {\normalsize An analysis of 99{,}441 orders from the Olist Brazilian e-commerce marketplace\par}
+\vspace{0.8em}
+{\small\itshape Revised October 2026 after the Milestone 1 feedback: growth multiple,
+Figure~3 attribution, Figure~5a, the Figure~8 discussion and the Candidate 1
+stakeholder use corrected; see the repository README.\par}
 
-\vspace{3.5cm}
+\vspace{2.9cm}
 
 {\large\bfseries Group 10\par}
 \vspace{0.9em}
@@ -85,7 +89,7 @@ Zhu Gengyu  & A0333773Y \\
 \vspace{1.1cm}
 {\normalsize
 \textbf{Dashboard:} \url{https://it5006-group-project-10.streamlit.app}\\[4pt]
-\textbf{Repository:} \url{https://github.com/gengyuzhu/IT5006-Group-Project-10}\par}
+\textbf{Repository:} {\small\url{https://github.com/gengyuzccc-cell/Team10_IT5006_Ecommerce_Analytics_AY2627Sem1}}\par}
 
 \vspace{1.2cm}
 \end{titlepage}
@@ -95,6 +99,9 @@ Zhu Gengyu  & A0333773Y \\
 \input{sections/02_eda}
 
 % ============================== REFERENCES =================================
+% Marks the last page of the body, so the 4-5 page budget can be checked from
+% the .aux rather than counted by eye.
+\phantomsection\label{sec:bodyend}
 \newpage
 \bibliography{refs}
 
@@ -316,8 +323,12 @@ derived & \code{freight\_ratio} & float & Y & Freight as a share of item value \
   \includegraphics[width=\linewidth]{fig02_volume_drift.pdf}
   \caption{(a) Order volume with the Black Friday 2017 spike. (b) The central
   temporal finding: mean delivery lead time halves across the window (line, left
-  axis) while the late rate is volatile rather than trending (bars, right axis),
-  spiking at Black Friday and during the May 2018 truckers' strike.}
+  axis) while the late rate is volatile rather than trending (bars, right axis).
+  The spikes are Black Friday (November 2017) and February--March 2018, a
+  carrier-side slowdown that coincided with a tightened promise. The truckers'
+  strike of 21 May--1 June 2018 is not visible at monthly resolution: the
+  platform lengthened its promised window in response, and June 2018 is the
+  series trough (Section~\ref{sec:temporal}).}
   \label{fig:volume}
 \end{figure}
 

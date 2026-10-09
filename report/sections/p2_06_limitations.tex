@@ -14,20 +14,28 @@ window, but that is a two-month-ahead check, and a calibration fitted on one
 prior drifts as the prior does.
 
 \paragraph{The largest driver of lateness is not observable at prediction time.}
-The late rate swings between 1.4\% and 21.4\% month to month with Black Friday
-2017 and the May 2018 truckers' strike. These are exogenous shocks --- carrier
-capacity, national road blockades --- that no order-level feature available at
-checkout can anticipate. This, not the choice of algorithm, is the binding
-constraint on Problem 1B, and it is why the ceiling was stated in advance rather
-than a weak classifier presented as a disappointment.
+The late rate swings between 1.4\% and 21.4\% month to month, and
+Appendix~\ref{app:lateness} traces the swings to their sources: a Black Friday
+surge, a two-month carrier-side slowdown in February--March 2018 that coincided
+with a tightened promise, and the truckers' strike of 21 May to 1 June 2018
+\citep{bloomberg2018strike}, visible only at weekly resolution and then absorbed
+into a longer promised window. All three are shocks to carrier capacity or to
+the platform's own promising policy; none is an attribute of an order, so no
+feature available at checkout can anticipate them. This, not the choice of
+algorithm, is the binding constraint on Problem 1B, and it is why the ceiling
+was stated in advance rather than a weak classifier presented as a
+disappointment.
 
 \paragraph{What the data does not contain, and what rests on assumption.}
-The service-quality literature identifies product expectation gaps, seller
-communication and returns handling among the drivers of dissatisfaction
-\citep{parasuraman2005esqual, rao2011elsq}; none appears in these nine tables, so
-the Problem 2 residual is unobserved cause rather than noise, and the free-text
-review columns (present for 11.7\% and 41.3\% of reviews) are too sparse to
-recover it. Olist publishes no cost figures, so Section~\ref{sec:cost} states its
+The target of Problem 2 is a platform rating, with the self-selection
+Section~\ref{sec:problem} describes: a model of the rating is not a model of
+satisfaction, and the 1--2 star label cannot see the quietly dissatisfied
+customer who never reviews. The service-quality literature identifies product
+expectation gaps, seller communication and returns handling among the drivers
+of dissatisfaction \citep{parasuraman2005esqual, rao2011elsq}; none appears in
+these nine tables, so the Problem 2 residual is unobserved cause rather than
+noise, and the free-text review columns (present for 11.7\% and 41.3\% of
+reviews) are too sparse to recover it. Olist publishes no cost figures, so Section~\ref{sec:cost} states its
 assumptions and reports break-even precision --- the quantity that decides the
 recommendation and moves with the assumption. And selection votes on three
 out-of-sample windows covering roughly February to June 2018: the right trade
@@ -57,7 +65,10 @@ the no-skill floor) than any classifier trained directly on the binary label
 (1.24$\times$), so the brief's dual framing turns out to be the substantively
 better design. The satisfaction model reaches 3.75$\times$ its floor on a target
 where always predicting ``satisfied'' scores 89\% accuracy and catches nothing,
-and scores identically on customers it has never seen.
+and scores identically on customers it has never seen. Read as a ranked list, it
+turns a capacity of ten contacts a day into an outreach queue of 57\%
+precision, and that capacity, not the model's threshold, is what limits its
+value.
 
 The methodological findings travel further. Cross-validation inside a drifting
 training period reorders the candidates relative to the forward window, and a

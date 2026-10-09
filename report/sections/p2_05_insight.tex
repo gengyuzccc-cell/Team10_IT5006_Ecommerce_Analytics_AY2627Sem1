@@ -63,7 +63,12 @@ precision is 0.125 and the model reaches 0.369 at its expected-benefit optimum,
 flagging 1{,}927 of 12{,}855 delivered orders (15.0\%) of which 712 do go on to
 leave a low review, for a net \textbf{R\$1{,}466 per 1{,}000 delivered orders}
 (Figure~\ref{fig:threshold}). The margin is wide enough that the conclusion
-survives a wrong cost estimate.
+survives a wrong cost estimate. Capacity changes how the optimum is used rather
+than where it is: a team that can work only 5\% of deliveries still captures
+R\$1{,}107 of those R\$1{,}466 per thousand orders (Table~\ref{tab:capacity}),
+because the top of the list is where the precision is, so benefit per contact
+is highest at the smallest capacities and the list is simply worked top-down
+until the agents run out.
 
 \textbf{The late-order flag does not pay --- for an expensive action.} This is the
 more useful finding, and reporting discrimination alone would have missed it.
@@ -73,26 +78,35 @@ it: precision plateaus at \textbf{0.29} and falls as volume rises, so expected n
 benefit is negative at every threshold flagging a meaningful number of orders. A
 model with ROC-AUC 0.782 and 2.9$\times$ the no-skill floor is genuinely
 informative and still not worth paying R\$12 an order to act on. That changes
-\emph{which} action it justifies rather than making it useless, because
-break-even falls with the cost of the intervention and two of the available
-interventions cost almost nothing. \textbf{Re-quoting} the promised date is free:
-the platform's own estimate is off by 9.79 days of MAE against the model's 3.90,
-so the date shown at checkout could be materially tightened, which
-\citet{cui2024promise} show trades directly against returns and retention.
-\textbf{Pre-warning} the buyer is nearly free, and at a threshold of 0.11 the
-flag catches \textbf{82.6\%} of the orders that will miss their date.
+\emph{which} action it justifies rather than making it useless: break-even
+falls with the cost of the intervention, and two of the available interventions
+-- re-quoting the date and pre-warning the buyer -- cost almost nothing
+(Section~\ref{sec:stakeholders}).
 
 \subsection{What each stakeholder does with this}
+\label{sec:stakeholders}
 
-\textbf{Operations, at checkout:} tighten the quoted delivery date using the
-model's estimate, and send a proactive notice on the orders flagged at the
-recall-oriented threshold, which covers five in six of those that will actually
-miss. Reserve expedited freight for the small high-precision tail, and revisit
-that policy if expediting falls below about R\$12 an order.
-\textbf{Customer experience, at delivery:} work the flagged list before the
-review window closes --- 7.6\% of deliveries at the tuned threshold, catching
-39.8\% of the orders that would draw a 1--2 star review at 57.5\% precision, or
-15.0\% at the cost-optimal threshold for a wider net.
+\textbf{Operations, at checkout} works the four levers of Table~\ref{tab:levers}
+in order of cost. Every order gets the re-quoted date: the model's estimate is
+off by 3.90 days against the promise's 9.79, so the date shown at checkout can
+be tightened materially, which \citet{cui2024promise} show trades directly
+against returns and retention. Every order above the recall-oriented threshold
+of 0.11 gets a proactive notice, which covers five in six of those that will
+actually miss. Expedited freight is reserved for a manual review of the top one
+or two per cent of the late list, where precision is 0.27 -- informative, but
+under the break-even an automatic rule would need -- and that policy is
+revisited only if expediting falls below about R\$11 an order. And the
+track-record features and the weekly late series are the monitoring
+instruments: a seller whose \code{hist\_seller\_late\_rate} climbs, or a week in
+which the carrier's transit time lengthens while the promise does not, is the
+February--March 2018 pattern beginning again (Appendix~\ref{app:lateness}).
+\textbf{Customer experience, at delivery} receives each day's deliveries ranked
+by $p_{\text{low}}$ and works the list from the top: at ten contacts a day --
+4.8\% of deliveries -- 57\% of contacts reach a customer who would have left a
+1--2 star review and a quarter of all such reviews are reached before they are
+written; a team with twice the capacity reaches 38\% of them at 44\% precision
+(Table~\ref{tab:capacity}). The dashboard's batch scorer returns exactly this
+list, ranked, with the top-$K$ marked for whatever capacity is entered.
 
 These are not two systems: the order flagged at checkout is the order that
 arrives late, and the order that arrives late is the one flagged for outreach, so
