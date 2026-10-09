@@ -76,7 +76,7 @@ Legend: **§** = section of `report/Team10_Phase2_IT5006_AY2627Sem1.pdf`.
 |---|---|
 | Python: pandas, scikit-learn, matplotlib/seaborn, numpy | `requirements.txt`, `requirements-dev.txt` |
 | Dashboard: Streamlit | `dashboard/app.py` — seven tabs |
-| Deployment: Streamlit Cloud | https://it5006-group-project-10.streamlit.app |
+| Deployment: Streamlit Cloud | https://team10-it5006-olist.streamlit.app |
 | Version control: GitHub | https://github.com/gengyuzccc-cell/Team10_IT5006_Ecommerce_Analytics_AY2627Sem1 (the Milestone 1 account was suspended; everything was re-pushed here) |
 | Documentation: Jupyter notebooks with markdown | `notebooks/05–09`, executed with outputs |
 
@@ -117,7 +117,7 @@ Legend: **§** = section of `report/Team10_Phase2_IT5006_AY2627Sem1.pdf`.
 
 | Guideline | How |
 |---|---|
-| Accessible via live URL | https://it5006-group-project-10.streamlit.app |
+| Accessible via live URL | https://team10-it5006-olist.streamlit.app |
 | Error handling for edge cases | Invalid dates, non-positive amounts, more sellers than items, empty/malformed/oversized CSV, missing columns, unknown category or state, missing model artifacts, scikit-learn version drift |
 | Clear usage instructions | Sidebar guide; form defaults; downloadable CSV template |
 | Document any API endpoints with examples | No API endpoints — the proof of concept is the Streamlit app. The batch CSV contract is documented in the Predict tab and in Appendix E |

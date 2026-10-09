@@ -16,7 +16,7 @@ that serves them.
 | Phase 1 report (PDF) | [`report/Team10_Phase1_IT5006_AY2627Sem1.pdf`](report/) — literature review and EDA; revised October 2026 to correct the facts the Milestone 1 feedback named |
 | LaTeX sources | [`report/*.tex`](report/), [`report/sections/`](report/sections/), [`report/refs.bib`](report/refs.bib) — the folder uploads to Overleaf and compiles as-is |
 | Notebooks | [`notebooks/*.ipynb`](notebooks/) — nine, executed with outputs (01–04 Phase 1, 05–09 Phase 2) |
-| Dashboard | **[it5006-group-project-10.streamlit.app](https://it5006-group-project-10.streamlit.app)** — seven tabs, including live model scoring |
+| Dashboard | **[team10-it5006-olist.streamlit.app](https://team10-it5006-olist.streamlit.app)** — seven tabs, including live model scoring |
 | Reusable code | [`src/`](src/) · validation checks in [`tests/`](tests/) |
 | Fitted models | [`models/`](models/) — under 2 MB, with metadata |
 
@@ -289,7 +289,7 @@ current one.
 
 ### Deploying
 
-Live at **[it5006-group-project-10.streamlit.app](https://it5006-group-project-10.streamlit.app)**,
+Live at **[team10-it5006-olist.streamlit.app](https://team10-it5006-olist.streamlit.app)**,
 built from `main` / `dashboard/app.py` on **Python 3.12**.
 
 > **Keep the Python version at 3.12 or lower** (*App settings → General*).
