@@ -47,7 +47,7 @@ Legend: **§** = section of `report/Team10_Phase2_IT5006_AY2627Sem1.pdf`.
 | Ensemble or stacking results | §4.5 — Voting and Stacking from families A + B; earns its place on 1A, does not on 2, both reported |
 | Actionable insights for the stakeholder | Table 2 (the levers each team pulls, with trigger and cost), §5.2, §5.3 — decision policy, capacity-based operating point, cost sensitivity, per-stakeholder actions |
 | Discussion of limitations and constraints | §6, and the honest protocol failure in §4.2 |
-| Response to the Milestone 1 feedback | Appendix I maps each feedback point to the section that acts on it; Appendix G is the corrected lateness analysis with the strike cited |
+| Response to the Milestone 1 feedback | Appendix H maps each feedback point to the section that acts on it; Appendix G is the corrected lateness analysis with the strike cited |
 
 ## Submission format
 

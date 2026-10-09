@@ -158,7 +158,7 @@ Four results that outlived the models themselves.
 
 ## Changes after the Milestone 1 feedback
 
-The Milestone 1 feedback is answered point by point in Appendix I of the Phase 2
+The Milestone 1 feedback is answered point by point in Appendix H of the Phase 2
 report. In short:
 
 | Feedback | What changed |
