@@ -75,6 +75,20 @@ def load_artifacts() -> dict:
 
 
 @st.cache_data(show_spinner=False)
+def load_capacity() -> pd.DataFrame | None:
+    """Precision@K / Recall@K of the review model on the held-out test window.
+
+    Written by src/capacity_metrics.py after the Milestone 1 feedback, which
+    pointed out that a team with limited capacity works a ranked list from the
+    top, so the metric that describes its day is the precision of the top-K.
+    The table is tracked in the repository, so the deployed app can show it
+    without recomputing anything.
+    """
+    path = PROJECT_ROOT / "report" / "results" / "capacity_p2.csv"
+    return pd.read_csv(path) if path.exists() else None
+
+
+@st.cache_data(show_spinner=False)
 def route_distances(_df: pd.DataFrame) -> tuple[dict, float]:
     """Median customer-seller distance per state pair, for the form to fill in.
 
@@ -429,6 +443,60 @@ def render_batch(df: pd.DataFrame, art: dict) -> None:
     st.download_button("Download scored orders", buf.getvalue(),
                        "scored_orders.csv", "text/csv", type="primary")
 
+    render_triage(scored)
+
+
+# ===========================================================================
+# UI - triage list (capacity-constrained, added after the Milestone 1 feedback)
+# ===========================================================================
+def render_triage(scored: pd.DataFrame) -> None:
+    """The ranked list a customer-experience team actually works.
+
+    A flag at a threshold is not what a team with K agents does: it works the
+    day's orders from the riskiest down until capacity runs out. This view ranks
+    the scored file by review risk, marks the top-K for a capacity the user
+    enters, and shows the precision and recall that capacity achieved on the
+    held-out test window (report Section 4.4).
+    """
+    st.markdown("---")
+    st.markdown(
+        theme.section("Triage list: work the top of the ranking",
+                      "Orders ranked by review risk, then by late risk. Enter the "
+                      "number of contacts your team can make and the top-K are marked."),
+        unsafe_allow_html=True)
+
+    n = len(scored)
+    k = int(st.number_input("Contacts your team can make (capacity K)", min_value=1,
+                            max_value=max(1, n), value=min(10, n), step=1))
+    ranked = scored.sort_values(["p_low_review", "p_late"], ascending=False).reset_index(drop=True)
+    ranked.insert(0, "rank", np.arange(1, n + 1))
+    ranked.insert(1, "in_top_k", ranked["rank"] <= k)
+    share = 100 * k / n
+
+    cap = load_capacity()
+    if cap is not None and len(cap):
+        row = cap.iloc[(cap["k_pct"] - share).abs().argmin()]
+        st.caption(
+            f"Top {k:,} of {n:,} orders = {share:.1f}% of this file. On the held-out "
+            f"test window, acting on the top {row['k_pct']:g}% of deliveries reached a "
+            f"customer who would have left a 1–2 star review "
+            f"{100*row['precision_at_k']:.0f}% of the time (precision@K) and covered "
+            f"{100*row['recall_at_k']:.0f}% of all such reviews (recall@K), "
+            f"{row['lift_at_k']:.1f}× better than contacting at random. The review "
+            f"risk here is conditional on the forecast delivery; in production, "
+            f"re-score at delivery with the realised dates.")
+    else:
+        st.caption(f"Top {k:,} of {n:,} orders = {share:.1f}% of this file.")
+
+    cols = ["rank", "in_top_k", "p_low_review", "p_late", "predicted_days",
+            "promised_days"] + [c for c in BATCH_COLUMNS if c in ranked.columns]
+    st.dataframe(ranked[cols].head(max(k, 10)), use_container_width=True, hide_index=True,
+                 column_config={"in_top_k": st.column_config.CheckboxColumn("in top-K")})
+    buf = io.StringIO()
+    ranked.to_csv(buf, index=False)
+    st.download_button("Download the ranked triage list", buf.getvalue(),
+                       "triage_list.csv", "text/csv")
+
 
 # ===========================================================================
 # UI - model card
@@ -502,9 +570,11 @@ def render_model_card() -> None:
             "- **It is fitted on Brazil, 2017–2018.** Lead time halved across that "
             "window; a model trained on it is off-level on any other period and "
             "needs refitting on a rolling basis.\n"
-            "- **Lateness is driven by shocks the model cannot see** — Black Friday "
-            "congestion, the May 2018 truckers' strike. Order-level features "
-            "cannot anticipate a national road blockade.\n"
+            "- **Lateness is driven by shocks the model cannot see** — a Black Friday "
+            "surge, a carrier-side slowdown in February–March 2018 that coincided "
+            "with a tightened promise, and the May 2018 truckers' strike, visible "
+            "only at weekly resolution. None is an attribute of an order, so no "
+            "checkout-time feature can anticipate them.\n"
             "- **Review risk is scored at delivery.** Asked at checkout, the same "
             "target is far weaker, because the variable that matters most has not "
             "happened yet.\n"
@@ -513,8 +583,27 @@ def render_model_card() -> None:
             "- **These are decision scores for triage, not entitlements.** They "
             "must not be used to penalise a seller or price a customer.")
 
+    cap = load_capacity()
+    if cap is not None and len(cap):
+        st.markdown("#### What a ranked list delivers at a fixed capacity")
+        st.caption(
+            "Precision@K and Recall@K of the review-risk model on the held-out test "
+            "window. A customer-experience team that can contact K% of the day's "
+            "deliveries works the list from the top; precision stays above the "
+            "break-even of 0.125 at every capacity shown, so the team's capacity, "
+            "not the model's threshold, is what limits the value. Added after the "
+            "Milestone 1 feedback; see report Section 4.4.")
+        show = (cap[cap["k_pct"].isin([1, 2, 5, 10, 15, 20, 30])]
+                [["k_pct", "precision_at_k", "recall_at_k", "lift_at_k"]]
+                .rename(columns={"k_pct": "capacity K (% of deliveries)",
+                                 "precision_at_k": "precision@K",
+                                 "recall_at_k": "recall@K",
+                                 "lift_at_k": "lift vs random"}))
+        st.dataframe(show.round(3), hide_index=True, use_container_width=True)
+
     st.markdown("#### Reproducibility")
     st.code("python src/train_models.py      # refits everything and rewrites models/\n"
+            "python src/capacity_metrics.py  # Precision@K / Recall@K from the saved predictions\n"
             "python tests/test_leakage.py    # validation checks, incl. the history features\n"
             "python src/phase2_stats.py      # regenerates every number in the report",
             language="bash")

@@ -45,11 +45,17 @@ st.markdown(theme.CSS, unsafe_allow_html=True)
 PLOT_CFG = {"displayModeBar": False, "responsive": True}
 DATA_DIR = PROJECT_ROOT / "data" / "raw" / "olist"
 
-# Events visible in the delivery series.
+# Events visible in the delivery series. The February-March 2018 entry was added
+# after the Milestone 1 feedback: it is the largest late-rate peak in the data
+# (a carrier-side slowdown that coincided with a tightened promised window),
+# whereas the May 2018 truckers' strike is visible only at weekly resolution.
 EVENTS = [
     (pd.Timestamp("2017-11-24"), "Black Friday"),
+    (pd.Timestamp("2018-02-19"), "Carrier slowdown"),
     (pd.Timestamp("2018-05-21"), "Truckers' strike"),
 ]
+STRIKE = (pd.Timestamp("2018-05-21"), pd.Timestamp("2018-06-01"))
+SLOWDOWN = (pd.Timestamp("2018-02-19"), pd.Timestamp("2018-04-08"))
 
 
 # ===========================================================================
@@ -242,10 +248,12 @@ with tab1:
     st.markdown(
         theme.note(
             "What to look for",
-            "Volume roughly triples across the window, and <b>November 2017 — Black "
-            "Friday — is the largest single demand event</b> at about 1.5&times; a "
-            "typical month. Watch what that spike does to delivery performance in "
-            "the next tab: the marketplace absorbs the orders, but not the parcels."
+            "Volume rises about <b>eight-fold</b> across the window — from roughly "
+            "800 orders in January 2017 to 6,000–7,500 a month through 2018 — and "
+            "<b>November 2017 (Black Friday) is the largest single demand event</b> "
+            "at about 1.5&times; the median month. Watch what that spike does to "
+            "delivery performance in the next tab: the marketplace absorbs the "
+            "orders, but not the parcels."
         ),
         unsafe_allow_html=True,
     )
@@ -318,11 +326,55 @@ with tab2:
             "the past is badly off-level on the present and R² turns negative even "
             "when the model is useful. Mean absolute error is the metric that "
             "survives. Lateness, by contrast, does not trend — it swings between "
-            "1.4% and 21.4% with Black Friday and the May 2018 truckers' strike, "
-            "which is why an order-level late classifier has a low ceiling."
+            "1.4% and 21.4%. The largest peaks are <b>February–March 2018</b>: "
+            "carrier transit lengthened by about three days while the promised "
+            "window was tightened by about four. The truckers' strike of 21 May–"
+            "1 June 2018 is invisible at monthly resolution — see the weekly chart "
+            "below: orders caught in transit were 16.0% late, and the platform then "
+            "lengthened its promise from about 19 to 37 days, which is why June is "
+            "the quietest month. None of this is observable at checkout, which is "
+            "why an order-level late classifier has a low ceiling."
         ),
         unsafe_allow_html=True,
     )
+
+    # Weekly resolution, added after the Milestone 1 feedback: a ten-day strike
+    # cannot be seen in a monthly series, and what the monthly series records
+    # instead is the platform's response - a much longer promised window.
+    st.markdown(
+        theme.section("Weekly: the strike shows up, and so does the platform's response",
+                      "Late rate by purchase week (bars) against the mean promised "
+                      "window (line). Shaded: the carrier slowdown and the strike."),
+        unsafe_allow_html=True,
+    )
+    wk = (dd.groupby(dd["order_purchase_timestamp"].dt.to_period("W-SUN").dt.start_time)
+            .agg(late_pct=("is_late", lambda s: 100 * s.mean()),
+                 promise_days=("estimated_days", "mean"),
+                 n=("delivery_days", "size"))
+            .reset_index().rename(columns={"order_purchase_timestamp": "week"}))
+    wk = wk[wk["n"] >= 50]
+    if len(wk) >= 4:
+        fig = go.Figure()
+        fig.add_bar(x=wk["week"], y=wk["late_pct"], name="% delivered late, by purchase week",
+                    marker_color=theme.ACCENT, opacity=0.5)
+        fig.add_scatter(x=wk["week"], y=wk["promise_days"], name="promised window (mean days)",
+                        yaxis="y2", mode="lines", line=dict(color=theme.PRIMARY, width=2))
+        for (x0, x1), label, colour, pos in [
+                (SLOWDOWN, "Feb–Apr 2018: carrier slowdown, promise tightened", theme.GOLD, "top left"),
+                (STRIKE, "truckers' strike 21 May–1 Jun", "#777777", "bottom right")]:
+            if wk["week"].min() <= x1 and wk["week"].max() >= x0:
+                fig.add_vrect(x0=x0, x1=x1, fillcolor=colour, opacity=0.18, line_width=0,
+                              annotation_text=label, annotation_position=pos,
+                              annotation_font=dict(size=10, color=theme.INK))
+        fig.update_layout(
+            height=380,
+            yaxis=dict(title="% delivered late"),
+            yaxis2=dict(title="promised days", overlaying="y", side="right", showgrid=False),
+        )
+        st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG)
+    else:
+        st.caption("Widen the filters to see the weekly series (needs at least four weeks "
+                   "with 50 or more delivered orders).")
 
     c1, c2 = st.columns(2, gap="medium")
     with c1:
@@ -550,5 +602,5 @@ st.markdown("---")
 st.caption(
     "IT5006 Fundamentals of Data Analytics · Group Project · National University "
     "of Singapore. Built with Streamlit. Source: "
-    "https://github.com/gengyuzhu/Team10_IT5006_Ecommerce_Analytics_AY2627Sem1"
+    "https://github.com/gengyuzccc-cell/Team10_IT5006_Ecommerce_Analytics_AY2627Sem1"
 )
