@@ -1,0 +1,5 @@
+cohort,n,late_pct,mean_lead,median_lead,promise_days,seller_days,carrier_days,mean_delay
+"May 1-20, delivered before the strike",2749.0,0.3638,6.8468,6.6051,19.5258,2.0074,4.8395,-12.679
+"in transit during the strike (bought before 1 Jun, arrived on/after 21 May)",4228.0,16.9347,16.3678,14.2399,25.5016,3.2547,13.1131,-9.1338
+bought during the strike (21 May - 1 Jun),1502.0,3.5286,12.2036,12.0903,29.3987,2.991,9.2126,-17.1952
+"bought 2-30 June, after the strike",5912.0,1.3701,9.1484,7.9108,27.4663,2.5006,6.6478,-18.3179

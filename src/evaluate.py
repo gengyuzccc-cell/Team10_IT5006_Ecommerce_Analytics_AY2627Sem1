@@ -244,6 +244,76 @@ def cost_curve(y_true, y_score, cost_per_action: float, cost_per_miss: float,
     return out
 
 
+# ===========================================================================
+# Capacity-constrained evaluation
+# ===========================================================================
+# PR-AUC summarises the whole ranking and is the right quantity for choosing
+# between models. It is not the quantity a team with limited capacity lives
+# with. A customer-experience team that can contact K orders a day works the
+# list from the top and never sees the rest, so the metric that describes its
+# day is: of the K it reached, how many would really have left a 1-2 star
+# review (Precision@K), and what share of all such orders did those K cover
+# (Recall@K). The Milestone 1 feedback asked for exactly this alignment between
+# the metric and the business action.
+def precision_recall_at_k(y_true, y_score,
+                          fractions=(0.01, 0.02, 0.03, 0.05, 0.075, 0.10, 0.15,
+                                     0.20, 0.25, 0.30, 0.40, 0.50)) -> pd.DataFrame:
+    """Precision, recall and lift when only the top-K scored orders are acted on.
+
+    `fractions` are shares of the scored population, so K scales with volume
+    and the same table reads correctly on a quiet day and a Black Friday. The
+    ranking is by score, ties broken by position, which is what a sorted list
+    does. Lift is precision divided by the base rate: how much better than
+    picking K orders at random.
+    """
+    y_true = np.asarray(y_true, dtype=int)
+    y_score = np.asarray(y_score, dtype=float)
+    hits = y_true[np.argsort(-y_score, kind="stable")]
+    n, positives = len(hits), int(hits.sum())
+    base = positives / n if n else np.nan
+    rows = []
+    for f in fractions:
+        k = max(1, int(round(f * n)))
+        tp = int(hits[:k].sum())
+        precision = tp / k
+        rows.append({
+            "k_pct": float(100 * f), "k": k, "tp": tp,
+            "precision_at_k": precision,
+            "recall_at_k": tp / positives if positives else np.nan,
+            "lift_at_k": precision / base if base else np.nan,
+        })
+    return pd.DataFrame(rows)
+
+
+def capacity_curve(y_true, y_score, timestamps, per_period_k=(5, 10, 20, 40),
+                   freq: str = "D") -> pd.DataFrame:
+    """Top-K per calendar period: what a fixed daily capacity actually delivers.
+
+    `precision_recall_at_k` ranks the whole window at once, which no team can
+    do - it sees today's deliveries today. Here the list is cut per period
+    (default: per day of purchase), the K highest-scored orders are taken from
+    each, and precision and recall are computed over everything acted on.
+    """
+    frame = pd.DataFrame({"y": np.asarray(y_true, dtype=int),
+                          "s": np.asarray(y_score, dtype=float)})
+    frame["period"] = pd.to_datetime(pd.Series(np.asarray(timestamps))).dt.to_period(freq).to_numpy()
+    positives = int(frame["y"].sum())
+    ranked = frame.sort_values(["period", "s"], ascending=[True, False], kind="stable")
+    ranked["pos"] = ranked.groupby("period").cumcount()
+    rows = []
+    for k in per_period_k:
+        top = ranked[ranked["pos"] < k]
+        tp, flagged = int(top["y"].sum()), int(len(top))
+        rows.append({"k_per_period": int(k), "freq": freq,
+                     "periods": int(frame["period"].nunique()),
+                     "flagged": flagged,
+                     "flagged_pct": 100 * flagged / len(frame),
+                     "tp": tp,
+                     "precision": tp / flagged if flagged else np.nan,
+                     "recall": tp / positives if positives else np.nan})
+    return pd.DataFrame(rows)
+
+
 def segment_metrics(frame: pd.DataFrame, y_col: str, score_col: str, by: str,
                     threshold: float = 0.5, min_n: int = 200) -> pd.DataFrame:
     """Per-segment performance - the robustness and fairness check.

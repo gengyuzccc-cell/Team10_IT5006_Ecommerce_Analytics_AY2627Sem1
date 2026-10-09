@@ -277,6 +277,78 @@ S["c2_unseen_prauc"] = round(float(average_precision_score(
 
 
 # ===========================================================================
+# Added after the Milestone 1 feedback. Everything above is unchanged, so the
+# numbers the submitted report quoted still regenerate to the same values; the
+# keys below back the corrections the feedback asked for.
+# ===========================================================================
+# -- growth: "roughly triples" was wrong ---------------------------------------
+vol_all = df.groupby(df["order_purchase_timestamp"].dt.to_period("M")).size()
+S["growth_first_month"] = str(vol_all.index[0])
+S["growth_first_month_orders"] = int(vol_all.iloc[0])
+S["growth_peak_month"] = str(vol_all.idxmax())
+S["growth_peak_orders"] = int(vol_all.max())
+S["growth_peak_ratio"] = round(float(vol_all.max() / vol_all.iloc[0]), 1)
+S["growth_2018_mean_orders"] = int(round(vol_all["2018-01":"2018-08"].mean()))
+S["growth_2018_mean_ratio"] = round(float(vol_all["2018-01":"2018-08"].mean() / vol_all.iloc[0]), 1)
+S["growth_2018_min_orders"] = int(vol_all["2018-01":"2018-08"].min())
+S["growth_2018_max_orders"] = int(vol_all["2018-01":"2018-08"].max())
+S["black_friday_over_median_x"] = round(float(vol_all.max() / vol_all.median()), 1)
+
+# -- when the late deliveries happened ----------------------------------------
+for ym, tag in [("2017-10", "oct2017"), ("2017-11", "nov2017"), ("2018-01", "jan2018"),
+                ("2018-02", "feb2018"), ("2018-03", "mar2018"), ("2018-04", "apr2018"),
+                ("2018-05", "may2018"), ("2018-06", "jun2018"), ("2018-08", "aug2018")]:
+    S[f"late_{tag}_pct"] = round(100 * float(monthly.loc[ym, "late"]), 1)
+
+d2 = d.copy()
+d2["carrier_days"] = ((d2["order_delivered_customer_date"] - d2["order_delivered_carrier_date"])
+                      .dt.total_seconds() / 86400)
+d2["seller_days"] = ((d2["order_delivered_carrier_date"] - d2["order_purchase_timestamp"])
+                     .dt.total_seconds() / 86400)
+pm = d2["order_purchase_timestamp"].dt.to_period("M").astype(str)
+peak = pm.isin(["2018-02", "2018-03"])
+S["peak_carrier_days"] = round(float(d2.loc[peak, "carrier_days"].mean()), 1)
+S["rest_carrier_days"] = round(float(d2.loc[~peak, "carrier_days"].mean()), 1)
+S["peak_seller_days"] = round(float(d2.loc[peak, "seller_days"].mean()), 1)
+S["rest_seller_days"] = round(float(d2.loc[~peak, "seller_days"].mean()), 1)
+S["promise_jan2018_days"] = round(float(d2.loc[pm == "2018-01", "estimated_days"].mean()), 1)
+S["promise_mar2018_days"] = round(float(d2.loc[pm == "2018-03", "estimated_days"].mean()), 1)
+S["promise_jun2018_days"] = round(float(d2.loc[pm == "2018-06", "estimated_days"].mean()), 1)
+
+# Monday-to-Sunday purchase weeks around the strike of 21 May - 1 June 2018.
+wk = d2.groupby(d2["order_purchase_timestamp"].dt.to_period("W-SUN").dt.start_time).agg(
+    n=("order_id", "size"), late=("target_is_late", "mean"), promise=("estimated_days", "mean"))
+wk.index = wk.index.strftime("%Y-%m-%d")
+S["strike_week_before_late_pct"] = round(100 * float(wk.loc["2018-05-14", "late"]), 1)
+S["strike_week_before_promise_days"] = round(float(wk.loc["2018-05-14", "promise"]), 1)
+S["strike_week_late_pct"] = round(100 * float(wk.loc["2018-05-21", "late"]), 1)
+S["strike_week_promise_days"] = round(float(wk.loc["2018-05-21", "promise"]), 1)
+S["strike_week_after_late_pct"] = round(100 * float(wk.loc["2018-05-28", "late"]), 1)
+S["strike_week_after_promise_days"] = round(float(wk.loc["2018-05-28", "promise"]), 1)
+S["weeks_apr_early_may_mean_late_pct"] = round(
+    100 * float(wk.loc["2018-04-09":"2018-05-07", "late"].mean()), 1)
+in_transit = ((d2["order_purchase_timestamp"] < pd.Timestamp("2018-06-01"))
+              & (d2["order_delivered_customer_date"] >= pd.Timestamp("2018-05-21")))
+S["strike_in_transit_n"] = int(in_transit.sum())
+S["strike_in_transit_late_pct"] = round(100 * float(d2.loc[in_transit, "target_is_late"].mean()), 1)
+
+# -- the correlation matrix the text never discussed (Figure 8) ----------------
+# Computed on the full analysis frame with pairwise deletion, exactly as
+# notebook 03 draws the figure, so these match the printed cells.
+S["corr_fig8_leadtime_distance"] = round(float(df["target_delivery_days"].corr(df["distance_km"])), 2)
+S["corr_fig8_leadtime_promise"] = round(float(df["target_delivery_days"].corr(df["estimated_days"])), 2)
+S["corr_fig8_leadtime_freight"] = round(float(df["target_delivery_days"].corr(df["total_freight"])), 2)
+S["corr_fig8_leadtime_weight"] = round(float(df["target_delivery_days"].corr(df["total_weight_g"])), 2)
+S["corr_fig8_promise_distance"] = round(float(df["estimated_days"].corr(df["distance_km"])), 2)
+S["corr_fig8_freight_weight"] = round(float(df["total_freight"].corr(df["total_weight_g"])), 2)
+S["corr_fig8_review_leadtime"] = round(float(df["review_score"].corr(df["target_delivery_days"])), 2)
+S["corr_fig8_review_promise"] = round(float(df["review_score"].corr(df["estimated_days"])), 2)
+S["corr_fig8_leadtime_price"] = round(float(df["total_price"].corr(df["target_delivery_days"])), 2)
+S["corr_fig8_leadtime_items"] = round(float(df["n_items"].corr(df["target_delivery_days"])), 2)
+S["corr_fig8_review_items"] = round(float(df["review_score"].corr(df["n_items"])), 2)
+
+
+# ===========================================================================
 if __name__ == "__main__":
     out = config.PROJECT_ROOT / "report" / "stats.txt"
     out.parent.mkdir(parents=True, exist_ok=True)

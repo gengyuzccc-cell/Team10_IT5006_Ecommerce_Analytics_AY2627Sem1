@@ -305,7 +305,131 @@ S["bands_suspicious"] = int(bands["verdict"].str.startswith("SUSPICIOUSLY").sum(
 S["bands_short"] = int((bands["verdict"] == "short of target").sum())
 
 # ===========================================================================
-# 10. Deployment footprint
+# 10. Capacity-constrained evaluation (Milestone 1 feedback: Precision@K)
+# ===========================================================================
+cap2 = need("capacity_p2.csv")
+for _, row in cap2.iterrows():
+    tag = f"{row['k_pct']:g}".replace(".", "p")
+    S[f"cap_p2_k{tag}_precision"] = r(row["precision_at_k"])
+    S[f"cap_p2_k{tag}_recall"] = r(row["recall_at_k"])
+    S[f"cap_p2_k{tag}_lift"] = r(row["lift_at_k"], 2)
+    S[f"cap_p2_k{tag}_net_per_1k"] = r(row["net_benefit_per_1k"], 0)
+S["cap_p2_breakeven_precision"] = r(cap2["break_even_precision"].iloc[0])
+S["cap_p2_max_k_pct_above_breakeven"] = r(cap2.loc[cap2["above_break_even"], "k_pct"].max(), 1)
+S["cap_p2_best_net_k_pct"] = r(cap2.loc[cap2["net_benefit_per_1k"].idxmax(), "k_pct"], 1)
+
+daily = need("capacity_p2_daily.csv")
+S["cap_p2_test_days"] = int(daily["periods"].iloc[0])
+S["cap_p2_orders_per_day"] = r(len(need("predictions_p2_test.csv")) / daily["periods"].iloc[0], 0)
+_base_p2 = float(need("predictions_p2_test.csv")["actual_low_review"].mean())
+for _, row in daily.iterrows():
+    k = int(row["k_per_period"])
+    S[f"cap_p2_daily_k{k}_precision"] = r(row["precision"])
+    S[f"cap_p2_daily_k{k}_recall"] = r(row["recall"])
+    S[f"cap_p2_daily_k{k}_flagged_pct"] = r(row["flagged_pct"], 1)
+    S[f"cap_p2_daily_k{k}_lift"] = r(row["precision"] / _base_p2, 2)
+
+cap1 = need("capacity_p1b.csv")
+S["cap_p1b_breakeven_precision"] = r(cap1["break_even_precision"].iloc[0])
+for route in ("derived", "direct"):
+    part = cap1[cap1["route"] == route]
+    for _, row in part.iterrows():
+        tag = f"{row['k_pct']:g}".replace(".", "p")
+        S[f"cap_p1b_{route}_k{tag}_precision"] = r(row["precision_at_k"])
+        S[f"cap_p1b_{route}_k{tag}_recall"] = r(row["recall_at_k"])
+        S[f"cap_p1b_{route}_k{tag}_lift"] = r(row["lift_at_k"], 2)
+    S[f"cap_p1b_{route}_max_precision"] = r(part["precision_at_k"].max())
+S["cap_p1b_derived_over_direct_k10_ratio"] = r(
+    S["cap_p1b_derived_k10_precision"] / S["cap_p1b_direct_k10_precision"], 1)
+_ratios = (cap1[cap1["route"] == "derived"].set_index("k_pct")["precision_at_k"]
+           / cap1[cap1["route"] == "direct"].set_index("k_pct")["precision_at_k"])
+S["cap_p1b_derived_over_direct_min_ratio"] = r(_ratios.loc[:30].min(), 1)
+S["cap_p1b_derived_over_direct_max_ratio"] = r(_ratios.loc[:30].max(), 1)
+S["cap_p1b_derived_breakeven_cost_reais"] = r(
+    S["cap_p1b_derived_max_precision"] * config.COSTS["late_delivery_cost"], 0)
+
+ops = need("capacity_operating_points.csv").set_index("problem")
+for label, tag in [("P2 tuned threshold (F1 on validation)", "p2_f1_threshold"),
+                   ("P2 cost-optimal threshold", "p2_cost_threshold"),
+                   ("P1B derived, tuned threshold", "p1b_threshold")]:
+    S[f"cap_{tag}_flagged_pct"] = r(ops.loc[label, "flagged_pct"], 1)
+    S[f"cap_{tag}_precision"] = r(ops.loc[label, "precision"])
+    S[f"cap_{tag}_recall"] = r(ops.loc[label, "recall"])
+
+# ===========================================================================
+# 11. Lateness anatomy (Milestone 1 feedback: the Figure 3 attribution)
+# ===========================================================================
+lm = need("lateness_monthly.csv").set_index("purchase_month")
+for ym, tag in [("2017-10", "oct17"), ("2017-11", "nov17"), ("2017-12", "dec17"),
+                ("2018-01", "jan18"), ("2018-02", "feb18"), ("2018-03", "mar18"),
+                ("2018-04", "apr18"), ("2018-05", "may18"), ("2018-06", "jun18"),
+                ("2018-07", "jul18"), ("2018-08", "aug18")]:
+    S[f"lat_{tag}_late_pct"] = r(lm.loc[ym, "late_pct"], 1)
+    S[f"lat_{tag}_promise_days"] = r(lm.loc[ym, "promise_days"], 1)
+    S[f"lat_{tag}_carrier_days"] = r(lm.loc[ym, "carrier_days"], 1)
+    S[f"lat_{tag}_seller_days"] = r(lm.loc[ym, "seller_days"], 1)
+S["lat_monthly_peak_month"] = str(lm["late_pct"].idxmax())
+S["lat_monthly_peak_pct"] = r(lm["late_pct"].max(), 1)
+S["lat_monthly_trough_month"] = str(lm["late_pct"].idxmin())
+S["lat_monthly_trough_pct"] = r(lm["late_pct"].min(), 2)
+
+pk = need("lateness_peak_anatomy.csv").set_index("period")
+for period, tag in [("Feb-Mar 2018", "peak"), ("rest of window", "rest")]:
+    S[f"lat_{tag}_late_pct"] = r(pk.loc[period, "late_pct"], 1)
+    S[f"lat_{tag}_carrier_days"] = r(pk.loc[period, "carrier_days"], 1)
+    S[f"lat_{tag}_seller_days"] = r(pk.loc[period, "seller_days"], 1)
+    S[f"lat_{tag}_promise_days"] = r(pk.loc[period, "promise_days"], 1)
+    S[f"lat_{tag}_n"] = int(pk.loc[period, "n"])
+reg = need("lateness_peak_by_region.csv")
+S["lat_peak_regions_elevated"] = int((reg["peak_late_pct"] > reg["rest_late_pct"]).sum())
+S["lat_peak_region_min_pct"] = r(reg["peak_late_pct"].min(), 1)
+S["lat_peak_region_max_pct"] = r(reg["peak_late_pct"].max(), 1)
+
+wk = need("lateness_weekly.csv").set_index("week_start")
+S["lat_week_early_feb_promise_days"] = r(wk.loc["2018-02-05", "promise_days"], 1)
+S["lat_week_early_feb_late_pct"] = r(wk.loc["2018-02-05", "late_pct"], 1)
+peak_weeks = wk.loc["2018-02-19":"2018-03-19"]
+S["lat_week_peak_max_late_pct"] = r(peak_weeks["late_pct"].max(), 1)
+S["lat_week_peak_max_week"] = str(peak_weeks["late_pct"].idxmax())
+S["lat_week_peak_promise_days"] = r(peak_weeks["promise_days"].mean(), 1)
+S["lat_week_peak_carrier_days"] = r(peak_weeks["carrier_days"].max(), 1)
+S["lat_week_recovery_week"] = str(wk.loc["2018-03-26":, "late_pct"].lt(5).idxmax())
+S["lat_week_pre_strike_late_pct"] = r(wk.loc["2018-05-14", "late_pct"], 1)
+S["lat_week_pre_strike_promise_days"] = r(wk.loc["2018-05-14", "promise_days"], 1)
+S["lat_week_pre_strike_n"] = int(wk.loc["2018-05-14", "n"])
+S["lat_week_strike_late_pct"] = r(wk.loc["2018-05-21", "late_pct"], 1)
+S["lat_week_strike_promise_days"] = r(wk.loc["2018-05-21", "promise_days"], 1)
+S["lat_week_strike_n"] = int(wk.loc["2018-05-21", "n"])
+S["lat_week_post_strike_late_pct"] = r(wk.loc["2018-05-28", "late_pct"], 1)
+S["lat_week_post_strike_promise_days"] = r(wk.loc["2018-05-28", "promise_days"], 1)
+S["lat_week_apr_may_mean_late_pct"] = r(wk.loc["2018-04-09":"2018-05-07", "late_pct"].mean(), 1)
+
+# The promise was tightened within a single homogeneous route as well, so it is
+# a promising decision rather than a change in the mix of routes.
+_sp = df[(df["customer_state"] == "SP") & (df["lead_seller_state"] == "SP")
+         & df["target_delivery_days"].notna()]
+_spw = _sp.groupby(_sp["order_purchase_timestamp"].dt.to_period("W-SUN").dt.start_time).agg(
+    promise=("estimated_days", "mean"), late=("target_is_late", "mean"))
+_spw.index = _spw.index.strftime("%Y-%m-%d")
+S["lat_spsp_promise_late_jan_days"] = r(_spw.loc["2018-01-29", "promise"], 1)
+S["lat_spsp_promise_late_mar_days"] = r(_spw.loc["2018-03-19", "promise"], 1)
+S["lat_spsp_promise_mid_apr_days"] = r(_spw.loc["2018-04-16", "promise"], 1)
+S["lat_spsp_late_late_jan_pct"] = r(100 * _spw.loc["2018-01-29", "late"], 1)
+S["lat_spsp_late_peak_pct"] = r(100 * _spw.loc["2018-02-19":"2018-03-19", "late"].max(), 1)
+
+st = need("lateness_strike.csv").set_index("cohort")
+_c = {"control": "May 1-20, delivered before the strike",
+      "transit": "in transit during the strike (bought before 1 Jun, arrived on/after 21 May)",
+      "during": "bought during the strike (21 May - 1 Jun)",
+      "after": "bought 2-30 June, after the strike"}
+for tag, name in _c.items():
+    S[f"lat_strike_{tag}_n"] = int(st.loc[name, "n"])
+    S[f"lat_strike_{tag}_late_pct"] = r(st.loc[name, "late_pct"], 1)
+    S[f"lat_strike_{tag}_carrier_days"] = r(st.loc[name, "carrier_days"], 1)
+    S[f"lat_strike_{tag}_promise_days"] = r(st.loc[name, "promise_days"], 1)
+
+# ===========================================================================
+# 12. Deployment footprint
 # ===========================================================================
 artifacts = sorted(config.MODELS_DIR.glob("*"))
 S["n_model_artifacts"] = len(artifacts)

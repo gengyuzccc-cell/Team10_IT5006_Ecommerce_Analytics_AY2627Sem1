@@ -286,6 +286,66 @@ except Exception as exc:  # noqa: BLE001
 
 
 # ===========================================================================
+print("\n8. Decision layer and EDA tables (added after the Milestone 1 feedback)")
+# ---------------------------------------------------------------------------
+# Precision@K / Recall@K are computed from the saved test predictions rather
+# than refitted, so the check here is that the arithmetic is right and that the
+# shipped tables match a recomputation.
+import evaluate as E
+
+RESULTS = PROJECT_ROOT / "report" / "results"
+# Eight orders, three positives; the ranking puts two positives first, then a
+# negative, then the third positive. Top 25% (two orders) is all hits; top 50%
+# (four orders) holds three of the three positives.
+_y = np.array([1, 1, 0, 1, 0, 0, 0, 0])
+_s = np.array([.9, .8, .7, .6, .5, .4, .3, .2])
+_full = E.precision_recall_at_k(_y, _s, fractions=(1.0,)).iloc[0]
+check("precision@100% is the base rate and recall@100% is one",
+      np.isclose(_full["precision_at_k"], _y.mean()) and _full["recall_at_k"] == 1.0)
+_top = E.precision_recall_at_k(_y, _s, fractions=(0.25, 0.5)).set_index("k_pct")
+check("precision@K counts the hits at the top of the ranking",
+      _top.loc[25.0, "precision_at_k"] == 1.0 and _top.loc[25.0, "recall_at_k"] == 2 / 3
+      and _top.loc[50.0, "precision_at_k"] == 0.75 and _top.loc[50.0, "recall_at_k"] == 1.0)
+
+try:
+    pred = pd.read_csv(RESULTS / "predictions_p2_test.csv",
+                       parse_dates=["order_purchase_timestamp"])
+    cap = pd.read_csv(RESULTS / "capacity_p2.csv")
+    recomputed = E.precision_recall_at_k(pred["actual_low_review"], pred["p_low_review"],
+                                         fractions=tuple(cap["k_pct"] / 100))
+    check("capacity_p2.csv reproduces from the per-order test predictions",
+          np.allclose(recomputed["precision_at_k"], cap["precision_at_k"])
+          and np.allclose(recomputed["recall_at_k"], cap["recall_at_k"]))
+    check("recall@K never falls as K grows",
+          bool(cap["recall_at_k"].is_monotonic_increasing))
+    daily = pd.read_csv(RESULTS / "capacity_p2_daily.csv")
+    check("a daily capacity of K never flags more than K orders per day",
+          bool((daily["flagged"] <= daily["k_per_period"] * daily["periods"]).all()))
+except FileNotFoundError as exc:
+    check("capacity tables exist (run src/capacity_metrics.py)", False, str(exc))
+
+try:
+    weekly = pd.read_csv(RESULTS / "lateness_weekly.csv").set_index("week_start")
+    monthly = pd.read_csv(RESULTS / "lateness_monthly.csv")
+    strike = pd.read_csv(RESULTS / "lateness_strike.csv").set_index("cohort")
+    check("weekly and monthly lateness tables cover the same delivered orders",
+          int(weekly["n"].sum()) == int(monthly["n"].sum()),
+          f"{int(weekly['n'].sum()):,} = {int(monthly['n'].sum()):,}")
+    before = weekly.loc["2018-04-09":"2018-05-07", "late_pct"].mean()
+    check("the week before the strike stands out from the weeks before it",
+          weekly.loc["2018-05-14", "late_pct"] > 2 * before,
+          f"{weekly.loc['2018-05-14', 'late_pct']:.1f}% vs {before:.1f}% mean")
+    check("the promised window lengthened during and after the strike",
+          weekly.loc["2018-05-28", "promise_days"] > weekly.loc["2018-05-14", "promise_days"] + 10)
+    transit = "in transit during the strike (bought before 1 Jun, arrived on/after 21 May)"
+    control = "May 1-20, delivered before the strike"
+    check("orders in transit during the strike were late far more often than May orders it missed",
+          strike.loc[transit, "late_pct"] > 5 * strike.loc[control, "late_pct"])
+except (FileNotFoundError, KeyError) as exc:
+    check("lateness tables exist (run src/lateness_anatomy.py)", False, repr(exc))
+
+
+# ===========================================================================
 print()
 if FAILURES:
     print(f"{len(FAILURES)} CHECK(S) FAILED:")

@@ -375,10 +375,146 @@ def fig_extrapolation() -> str:
     return save_fig(fig, "fig19_extrapolation")
 
 
+def fig_capacity() -> str:
+    """F11. Precision and recall when only the top K orders can be acted on.
+
+    The Milestone 1 feedback asked for the metric to match the action: a team
+    with capacity for K contacts a day works a ranked list from the top. Panel
+    (a) is the review-risk model; the vertical lines place the report's two
+    threshold operating points on the same axis. Panel (b) is the late flag,
+    derived route against the best direct classifier, where the break-even
+    precision for an expensive intervention is never reached.
+    """
+    cap2 = load("capacity_p2.csv")
+    cap1 = load("capacity_p1b.csv")
+    ops = load("capacity_operating_points.csv")
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(config.FIG_WIDTH, 3.3))
+
+    ax1.plot(cap2["k_pct"], cap2["precision_at_k"], "o-", color=P, ms=3.5,
+             label="precision@K")
+    ax1.plot(cap2["k_pct"], cap2["recall_at_k"], "s-", color=A, ms=3.5,
+             label="recall@K")
+    be = float(cap2["break_even_precision"].iloc[0])
+    ax1.axhline(be, color=M, ls="--", lw=1.0)
+    ax1.text(cap2["k_pct"].max(), be + 0.02, f"break-even precision {be:.3f}",
+             ha="right", fontsize=6.5, color=M)
+    for _, r in ops[ops["problem"].str.startswith("P2")].iterrows():
+        tuned = "tuned" in r["problem"]
+        ax1.axvline(r["flagged_pct"], color="#444", ls=":", lw=0.9)
+        ax1.text(r["flagged_pct"] + 0.7, 0.99 if tuned else 0.86,
+                 ("F1 threshold" if tuned else "cost optimum") + f"\n{r['flagged_pct']:.1f}%",
+                 fontsize=6.3, color="#444", va="top")
+    ax1.set_xlabel("capacity K, % of delivered orders")
+    ax1.set_ylabel("score")
+    ax1.set_ylim(0, 1.02)
+    ax1.set_title("(a) Review risk: the top-K list", loc="left")
+    ax1.legend(loc="center right", fontsize=7)
+
+    for route, colour, marker in [("derived", A, "o"), ("direct", P, "s")]:
+        d = cap1[cap1["route"] == route]
+        lab = ("derived from the lead-time regression" if route == "derived"
+               else f"direct classifier ({short(d['model'].iloc[0], 14)})")
+        ax2.plot(d["k_pct"], d["precision_at_k"], marker=marker, ls="-",
+                 color=colour, ms=3.5, label=f"{lab}: precision")
+        ax2.plot(d["k_pct"], d["recall_at_k"], marker=marker, ls="--",
+                 color=colour, ms=3, lw=1.0, alpha=0.75, label="recall")
+    be1 = float(cap1["break_even_precision"].iloc[0])
+    ax2.axhline(be1, color=M, ls="--", lw=1.0)
+    ax2.text(cap1["k_pct"].max(), be1 + 0.02, f"break-even for expediting {be1:.2f}",
+             ha="right", fontsize=6.5, color=M)
+    ax2.set_xlabel("capacity K, % of orders at checkout")
+    ax2.set_ylim(0, 1.02)
+    ax2.set_title("(b) Late flag: derived against direct", loc="left")
+    ax2.legend(loc="upper left", fontsize=6.3)
+    fig.tight_layout()
+    return save_fig(fig, "fig20_capacity")
+
+
+def fig_lateness_anatomy() -> str:
+    """F12. When the late deliveries happened, at the resolution that shows it.
+
+    Phase 1 read the monthly series and attributed its spikes to Black Friday and
+    the May 2018 truckers' strike. The monthly series cannot show a ten-day
+    strike; the weekly one can, and it also shows what the platform did about
+    it - lengthen the promised window - which is why June 2018 is the quietest
+    month in the data. Panel (b) splits lead time into the seller's handling
+    time and the carrier's transit time, which is what identifies the
+    February-March 2018 peak as a carrier-side slowdown.
+    """
+    import matplotlib.dates as mdates
+    from lateness_anatomy import (BLACK_FRIDAY, CARNIVAL_END, CARNIVAL_START,
+                                  STRIKE_END, STRIKE_START)
+
+    weekly = load("lateness_weekly.csv")
+    monthly = load("lateness_monthly.csv")
+    weekly["week_start"] = pd.to_datetime(weekly["week_start"])
+    x0, x1 = pd.Timestamp("2016-12-20"), pd.Timestamp("2018-09-10")
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(config.FIG_WIDTH, 5.6))
+
+    # -- (a) weekly late rate against the promised window ---------------------
+    x = weekly["week_start"]
+    ax1.bar(x + pd.Timedelta(days=3), weekly["late_pct"], width=6.2, color=A,
+            alpha=0.55, label="% delivered late, by purchase week")
+    ax1.set_ylabel("% delivered late", color=A)
+    ax1.tick_params(axis="y", colors=A)
+    ax1.set_ylim(0, weekly["late_pct"].max() * 1.35)
+    ax1b = ax1.twinx()
+    ax1b.plot(x + pd.Timedelta(days=3), weekly["promise_days"], color=P, lw=1.4,
+              label="promised window, mean days")
+    ax1b.set_ylabel("promised days", color=P)
+    ax1b.tick_params(axis="y", colors=P)
+    ax1b.set_ylim(0, weekly["promise_days"].max() * 1.3)
+    ax1b.grid(False)
+
+    ax1.axvspan(STRIKE_START, STRIKE_END, color="#777", alpha=0.25, lw=0)
+    ax1.axvspan(CARNIVAL_START, CARNIVAL_END, color=G, alpha=0.3, lw=0)
+    ytop = ax1.get_ylim()[1]
+    ax1.annotate("Black Friday", xy=(BLACK_FRIDAY, 15), xytext=(BLACK_FRIDAY, ytop * 0.80),
+                 fontsize=6.5, ha="center", color="#333",
+                 arrowprops=dict(arrowstyle="-", lw=0.6, color="#333"))
+    ax1.text(CARNIVAL_START, ytop * 0.93, "Carnival", fontsize=6.5, ha="right",
+             color="#333")
+    ax1.text(pd.Timestamp("2018-03-05"), ytop * 0.93, "carrier slowdown,\npromise tightened",
+             fontsize=6.5, ha="left", color="#333", va="top")
+    ax1.text(STRIKE_END + pd.Timedelta(days=2), ytop * 0.72,
+             "truckers' strike\n21 May - 1 Jun;\npromise lengthened", fontsize=6.5,
+             ha="left", color="#333", va="top")
+    ax1.set_xlim(x0, x1)
+    ax1.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    ax1.tick_params(axis="x", labelsize=7)
+    ax1.set_title("(a) Weekly late rate against the promised window", loc="left")
+    h1, l1 = ax1.get_legend_handles_labels()
+    h2, l2 = ax1b.get_legend_handles_labels()
+    ax1.legend(h1 + h2, l1 + l2, loc="upper left", fontsize=6.8)
+
+    # -- (b) lead time decomposed, monthly -------------------------------------
+    xm = pd.PeriodIndex(monthly["purchase_month"], freq="M").to_timestamp() + pd.Timedelta(days=15)
+    ax2.bar(xm, monthly["seller_days"], width=24, color=GR,
+            label="seller handling: purchase to carrier handoff")
+    ax2.bar(xm, monthly["carrier_days"], width=24, bottom=monthly["seller_days"],
+            color=P, label="carrier transit: handoff to customer")
+    ax2.plot(xm, monthly["promise_days"], color=G, marker="o", ms=3, lw=1.4,
+             label="promised window")
+    ax2.set_ylabel("days")
+    ax2.set_xlim(x0, x1)
+    ax2.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    ax2.tick_params(axis="x", labelsize=7)
+    ax2.set_xlabel("month of purchase")
+    ax2.set_title("(b) Lead time split into the seller's and the carrier's share",
+                  loc="left")
+    ax2.legend(loc="upper right", fontsize=6.8)
+    fig.tight_layout()
+    return save_fig(fig, "fig21_lateness_anatomy")
+
+
 # ===========================================================================
 FIGURES = [fig_regression_ladder, fig_regression_residuals, fig_late_routes,
            fig_low_review_curves, fig_calibration, fig_threshold_and_cost,
-           fig_cv_protocol, fig_importance, fig_segments, fig_extrapolation]
+           fig_cv_protocol, fig_importance, fig_segments, fig_extrapolation,
+           fig_capacity, fig_lateness_anatomy]
 
 if __name__ == "__main__":
     use_report_style()
