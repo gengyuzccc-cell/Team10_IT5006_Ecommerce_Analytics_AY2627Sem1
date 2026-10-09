@@ -24,6 +24,9 @@ saved per-order test predictions, for Section~\ref{sec:results-capacity};
 nothing is refitted \\[3pt]
 \code{python src/lateness\_anatomy.py} & The weekly, monthly and strike-cohort
 lateness tables of Appendix~\ref{app:lateness} \\[3pt]
+\code{python src/fit\_diagnostics.py} & Scores the three deployed models on the
+training, validation and test periods for Appendix~\ref{app:tvt}; nothing is
+refitted \\[3pt]
 \code{python src/figures\_phase2.py} & Draws every figure as vector PDF into
 \code{report/figures/} from those tables \\[3pt]
 \code{python src/phase2\_stats.py} & Distils every number quoted in this report
@@ -223,6 +226,7 @@ written by \code{src/train\_models.py} to \code{report/results/}:
 \code{bands.csv} & Headline metrics against the bands registered in advance \\
 \code{capacity\_*.csv} & Precision@$K$ and Recall@$K$, pooled and per day, for both flags; \code{capacity\_operating\_points.csv} places the threshold operating points on the same axis \\
 \code{lateness\_*.csv} & The lateness anatomy of Appendix~\ref{app:lateness}: monthly, weekly, the strike cohorts and the February--March 2018 peak \\
+\code{train\_val\_test.csv} & The deployed models scored on the training, validation and test periods (Appendix~\ref{app:tvt}) \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -428,6 +432,127 @@ for unpickling one. Invalid input --- a promised date before the purchase date, 
 negative price, more sellers than items, a malformed or empty upload, a missing
 column --- produces a specific message rather than a traceback. No credentials
 appear anywhere in the repository.
+
+\section{Training, validation and test side by side}
+\label{app:tvt}
+
+The results tables carry cross-validated, validation and test columns. The
+in-sample fit on the training period is the missing fourth view, and it is
+what separates over-fitting from drift: a model that has memorised its
+training period collapses between training and validation, while a model
+facing a changed world drops between validation and test, or in step with the
+base rate. \code{src/fit\_diagnostics.py} scores the three deployed artefacts
+on all three periods without refitting anything
+(\code{report/results/train\_val\_test.csv}).
+
+\begin{table}[htbp]
+\centering
+\caption{The deployed models on the training, validation and test periods.
+Thresholds and the margin-to-risk mapping are the ones fitted on the
+validation period and shipped. Lift is PR-AUC divided by that period's own
+positive rate.}
+\label{tab:tvt}
+\footnotesize
+{\setlength{\tabcolsep}{2.3pt}
+\begin{tabular}{@{}llrrrrrrrr@{}}
+\toprule
+\textbf{Model} & \textbf{Period} & \textbf{$n$} & \textbf{MAE} & \textbf{RMSE} & \textbf{$R^2$} & & & & \\
+\midrule
+P1A lead time (Voting)      & training   & 70{,}617 & 4.718 & 7.807 & 0.408 & & & & \\
+                            & validation & 12{,}957 & 4.784 & 6.592 & 0.222 & & & & \\
+                            & test       & 12{,}630 & 3.898 & 5.342 & 0.009 & & & & \\
+\midrule
+ & & \textbf{$n$} & \textbf{positives} & \textbf{ROC-AUC} & \textbf{PR-AUC} & \textbf{lift} & \textbf{bal.\ acc} & \textbf{F1} & \textbf{Brier} \\
+\midrule
+P1B late flag (derived)     & training   & 70{,}617 & 8.8\%  & 0.803 & 0.396 & 4.48$\times$ & 0.713 & 0.391 & 0.068 \\
+                            & validation & 12{,}957 & 5.0\%  & 0.787 & 0.166 & 3.34$\times$ & 0.648 & 0.227 & 0.044 \\
+                            & test       & 12{,}630 & 7.4\%  & 0.782 & 0.214 & 2.89$\times$ & 0.705 & 0.235 & 0.066 \\
+\midrule
+P2 low review (Stacking)    & training   & 72{,}380 & 15.8\% & 0.836 & 0.617 & 3.90$\times$ & 0.754 & 0.601 & 0.089 \\
+                            & validation & 13{,}094 & 11.4\% & 0.762 & 0.409 & 3.60$\times$ & 0.678 & 0.436 & 0.083 \\
+                            & test       & 12{,}855 & 11.0\% & 0.749 & 0.414 & 3.75$\times$ & 0.681 & 0.470 & 0.078 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Three readings. \textbf{The lead-time blend does not memorise its training
+period}: its in-sample MAE, 4.72 days, is level with the validation period's
+4.78 and \emph{above} the test window's 3.90, and the fall in $R^2$ from 0.41
+in-sample to 0.01 on test is the test period's small variance rather than a
+large error -- the level shift of Section~\ref{sec:limitations}, not
+over-fitting. \textbf{The derived late flag is stable}: ROC-AUC 0.80, 0.79,
+0.78 across the three periods, while its lift over the floor falls from
+4.5$\times$ to 2.9$\times$ only because the floor itself moves with the late
+rate. \textbf{The stacking ensemble shows the expected, modest in-sample
+optimism of a tree ensemble}: ROC-AUC 0.84 on the period it was fitted to
+against 0.76 and 0.75 on the two it never saw, and PR-AUC 0.62 against 0.41 --
+but validation and test agree with each other (lift 3.6$\times$ and
+3.75$\times$, Brier improving from 0.089 to 0.078 as the base rate falls),
+which is the comparison that governs deployment. Nothing here changes the
+selection, which was made on out-of-sample windows only
+(Section~\ref{sec:cv}).
+
+\section{Feature catalogue}
+\label{app:features}
+
+Every feature, with its definition, the reason it is in the model and the
+moment it becomes knowable. Literature pointers are to the works discussed in
+Section~\ref{sec:data}; empirical pointers are to Phase 1's exploratory
+analysis. All 36 are built by \code{src/features.py} from the nine tables alone.
+
+{\footnotesize
+% Inside this table \code follows the ambient size and the long typewriter
+% names may break after an underscore, or the first column overflows.
+\renewcommand{\code}[1]{\texttt{#1}}
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{@{}p{3.3cm}p{3.9cm}p{6.6cm}p{1.2cm}@{}}
+\caption{The 36 features by group. ``Checkout'' features are admissible for
+both problems; ``delivery'' features only for Problem 2.}
+\label{tab:features} \\
+\toprule
+\textbf{Feature} & \textbf{Definition} & \textbf{Why it is in the model} & \textbf{Known at} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Feature} & \textbf{Definition} & \textbf{Why it is in the model} & \textbf{Known at} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\multicolumn{4}{@{}l}{\textit{The promise (2)}} \\
+\code{estimated\_days} & promised delivery date minus purchase time, days & the platform's own routing knowledge, shown to the customer at checkout; strongest single correlate of lead time after distance ($r = 0.38$) and a decision variable in its own right \citep{cui2024promise, salari2022delivery} & checkout \\
+\code{long\_promise} & promised window above the pinned median of 23.2 days & flags the routes the platform itself expects to be slow; pinned so serving and training use the same cut & checkout \\
+\multicolumn{4}{@{}l}{\textit{Basket and money (11)}} \\
+\code{n\_items}, \code{n\_sellers} & items and distinct sellers in the order & multi-item and multi-seller orders consolidate before shipping; order composition is the standard control in order-level logistics studies \citep{deshpande2023logistics} & checkout \\
+\code{is\_multi\_seller} & more than one seller & split shipments wait for the slowest seller & checkout \\
+\code{log\_price} & $\log(1 + \text{item total})$ & money is right-skewed; the log stabilises the linear family; price relates to the rating, not to lead time (Phase 1 Figure~8) & checkout \\
+\code{price\_per\_item} & item total divided by items & separates one expensive item from many cheap ones & checkout \\
+\code{total\_freight} & freight paid, R\$ & the platform's own pricing of distance and bulk & checkout \\
+\code{freight\_ratio} & freight divided by item total & the delivery cost as the customer experiences it, relative to the purchase & checkout \\
+\code{log\_weight}, \code{max\_volume\_cm3} & $\log(1 + \text{total weight})$; bulkiest item's volume & handling and carrier constraints; physical attributes are standard delivery-time inputs \citep{salari2022delivery} & checkout \\
+\code{total\_photos} & listing photos across the items & a listing-quality proxy for the expectation gap behind a low rating & checkout \\
+\code{max\_installments} & largest instalment count & payment behaviour and an affordability signal characteristic of this market & checkout \\
+\multicolumn{4}{@{}l}{\textit{Calendar (6)}} \\
+\code{purchase\_month}, \code{purchase\_dow}, \code{purchase\_hour} & month, weekday, hour of purchase & seasonality and the weekly and daily rhythm of fulfilment (Phase 1, Figure~4); the usual calendar encodings for transactional data \citep{kuhn2019feature, heaton2016feature} & checkout \\
+\code{is\_weekend}, \code{is\_business\_hours} & weekend; 09:00--18:00 & an order placed outside working hours waits for the next handling day & checkout \\
+\code{is\_nov\_peak} & purchased on or after 20 November & the Black Friday surge stresses fulfilment: the late rate reached 14.3\% in November 2017 (Section~\ref{sec:problem}) & checkout \\
+\multicolumn{4}{@{}l}{\textit{Geography (4)}} \\
+\code{log\_distance} & $\log(1 + \text{km})$ between postcode centroids & the strongest checkout-time correlate of lead time ($r = 0.39$); distance is the backbone of delivery-time models \citep{liu2021lastmile} & checkout \\
+\code{same\_state} & seller and customer in the same state & the cheapest route class; only 35.7\% of orders & checkout \\
+\code{customer\_state} & destination state (27 levels) & regional logistics; rare levels pooled by the encoder & checkout \\
+\code{seller\_region} & origin region (5 levels) & origin logistics, collapsed from 27 states so the linear family is not swamped by sparse levels & checkout \\
+\multicolumn{4}{@{}l}{\textit{Catalogue and payment (2)}} \\
+\code{lead\_category} & category of the most expensive item (74 levels, rare ones pooled) & product type drives both handling and expectations; the category's effect is otherwise invisible to the model & checkout \\
+\code{lead\_payment\_type} & payment method of the largest payment & a boleto is paid at a bank and clears days after a card, so handling starts later; the top permutation feature for lead time (Section~\ref{sec:insight}) & checkout \\
+\multicolumn{4}{@{}l}{\textit{Track records (8), each an as-of aggregate over orders that had closed before this one was placed}} \\
+\code{hist\_seller\_\allowbreak lead\_days}, \code{hist\_seller\_\allowbreak late\_rate}, \code{hist\_seller\_\allowbreak low\_review\_rate} & the seller's mean lead time, late rate and 1--2 star rate over at least five earlier orders & a party's past performance is the standard predictor in supply-chain delay models \citep{baryannis2019risk}; the time-respecting form of target encoding \citep{miccibarreca2001target} & checkout \\
+\code{hist\_seller\_n} & number of earlier orders the seller estimate rests on & cold start as information: the model can discount a seller it has barely seen & checkout \\
+\code{hist\_route\_\allowbreak lead\_days} & mean lead time on the seller-state to customer-state route & origin--destination history, the route-level analogue of the above \citep{salari2022delivery} & checkout \\
+\code{hist\_category\_\allowbreak low\_review\_rate} & the category's past 1--2 star rate & categories differ in how often they disappoint; encoded without seeing the future & checkout \\
+\code{hist\_platform\_\allowbreak lead\_days}, \code{hist\_platform\_\allowbreak late\_rate} & platform-wide trailing 28-day mean lead time and late rate & the drift tracker: tells the model how fast the network is running right now \citep{gama2014drift} & checkout \\
+\multicolumn{4}{@{}l}{\textit{Delivery outcome (3), Problem 2 only}} \\
+\code{delivery\_days}, \code{delay\_vs\_\allowbreak estimate\_days}, \code{is\_late} & realised lead time; days late against the promise; late flag & the dominant driver of a 1--2 star review, 9.2\% to 54.0\% (Phase 1; \citealt{deshpande2023logistics}); known once the parcel has arrived and forbidden before & delivery \\
+\end{longtable}}
 
 \section{Contributions}
 \label{app:contributions}

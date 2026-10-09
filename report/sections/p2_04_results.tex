@@ -3,8 +3,12 @@
 
 Everything below is the untouched test window, 2018-07-01 to 2018-08-31, scored
 once for models already chosen. Cross-validated and validation columns sit beside
-it because the disagreement between them is part of the result. Figures are in
-Appendix~\ref{app:figures}.
+it because the disagreement between them is part of the result;
+Appendix~\ref{app:tvt} adds the in-sample training fit of the deployed models
+(review model ROC-AUC 0.836 in-sample, 0.762 validation, 0.749 test; lead-time
+MAE 4.72 in-sample against 4.78 validation), and
+Section~\ref{sec:results-segments} carries the error analysis by month and
+region. Figures are in Appendix~\ref{app:figures}.
 
 \subsection{Problem 1A --- lead time}
 \label{sec:results-reg}
@@ -51,7 +55,8 @@ fails to beat rung 0. \textbf{Inside family B complexity does pay}, monotonicall
 on validation: 5.927 $\rightarrow$ 5.513 $\rightarrow$ 4.802. And \textbf{only
 the ensemble has a positive $R^2$}; every other model is negative, which is the
 signature of a level shift rather than of a useless model, and the reason MAE
-leads throughout. The blend beats both its members (4.181 and 4.141 against
+leads throughout, as \citet{hyndman2006accuracy} recommend for errors judged
+against a na\"ive benchmark. The blend beats both its members (4.181 and 4.141 against
 3.898) by a specific mechanism: a tree cannot predict outside the range of the
 targets it was fitted on, because every leaf averages training values, and
 test-window lead times are systematically shorter than anything common in

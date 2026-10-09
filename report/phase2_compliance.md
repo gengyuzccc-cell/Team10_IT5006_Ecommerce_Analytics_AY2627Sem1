@@ -41,7 +41,8 @@ Legend: **§** = section of `report/Team10_Phase2_IT5006_AY2627Sem1.pdf`.
 | Hyperparameter tuning methodology | §3.3, Appendix C (search spaces and selected values) |
 | Classification metrics: Precision, Recall, F1, AUC-ROC / PR-AUC | §4.2, §4.3 — all reported in Tables 4 and 5 (precision and recall columns added after the Milestone 1 feedback), PR-AUC always against its no-skill floor, accuracy beside the majority-class rule; §4.4 adds Precision@K / Recall@K for the capacity-constrained action |
 | Regression metrics: MAE, RMSE, R² | §4.1 — all three, with MAE leading and R² read as a drift diagnostic |
-| Cross-validation results | Every results table carries the CV column beside validation and test; Appendix F quantifies what the protocol was telling us |
+| Cross-validation results | Every results table carries the CV column beside validation and test; Appendix F quantifies what the protocol was telling us; Appendix J adds the in-sample training fit so train / validation / test can be compared directly |
+| Feature engineering strategy, with a rationale per feature | §2.2 (groups, literature), Appendix K (all 36 features: definition, reason, moment knowable) |
 | Feature importance / interpretability | §5.1 — permutation importance on the test window, both problems, with the correlated-predictor caveat stated |
 | Model comparison and final selection with justification | §3.3 (the rule), §4.1, §4.2, §4.3 |
 | Ensemble or stacking results | §4.5 — Voting and Stacking from families A + B; earns its place on 1A, does not on 2, both reported |

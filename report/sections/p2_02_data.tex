@@ -68,7 +68,8 @@ distance, 0.38 with the promised window, 0.17 with freight and 0.07 with weight;
 promise and distance correlate 0.52 with each other, so both are kept and the
 trees resolve the overlap; and the review score correlates $-0.33$ with lead
 time and essentially zero with price or basket size -- the delivery, not the
-purchase, drives the rating.
+purchase, drives the rating. Appendix~\ref{app:features} lists all 36 features
+with definition, rationale and the moment each becomes knowable.
 
 \subsection{Track records, and the trap inside them}
 \label{sec:history}
@@ -107,7 +108,9 @@ requires exact agreement, and a second check confirms the platform tracker
 \subsection{Leakage: one rule per prediction moment}
 
 Leakage here is not one rule but one per \emph{prediction moment}, because what
-is known depends on when the model runs. \emph{At checkout} nothing about
+is known depends on when the model runs -- the \emph{illegitimate feature} and
+\emph{no clean separation} categories that \citet{kapoor2023leakage} found
+surviving peer review in 294 papers. \emph{At checkout} nothing about
 fulfilment or the customer's opinion exists, so delivery dates and everything
 derived from them, the review score and its timestamps,
 \code{order\_approved\_at}, \code{shipping\_limit\_date} and

@@ -35,6 +35,7 @@ python tests/test_leakage.py     # 41 validation checks
 python src/train_models.py       # fits everything, writes models/ and report/results/
 python src/capacity_metrics.py   # Precision@K / Recall@K from the saved test predictions (no refit)
 python src/lateness_anatomy.py   # weekly / monthly / strike-cohort lateness tables (no refit)
+python src/fit_diagnostics.py    # deployed models scored on train / validation / test (no refit)
 python src/figures_phase2.py     # draws every report figure
 python src/phase2_stats.py       # regenerates every number quoted in the Phase 2 report
 ```
@@ -254,6 +255,7 @@ current one.
 │   ├── train_models.py                 fits everything; the single source of truth
 │   ├── capacity_metrics.py             Precision@K / Recall@K from the saved predictions
 │   ├── lateness_anatomy.py             weekly, monthly and strike-cohort lateness tables
+│   ├── fit_diagnostics.py              deployed models on train / validation / test
 │   ├── figures_phase2.py               every report figure, drawn from the tables
 │   ├── phase2_stats.py                 regenerates every number in the Phase 2 report
 │   ├── report_stats.py                 regenerates every number in the Phase 1 report

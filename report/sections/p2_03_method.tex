@@ -30,8 +30,9 @@ against deep architectures \citep{grinsztajn2022tabular, shwartzziv2022tabular}
 and 41 classifiers on business credit data \citep{lessmann2015benchmarking} --
 boosted and bagged tree ensembles are the consistent top tier, boosting usually
 ahead by a small margin. The boosted learner is \code{HistGradientBoosting}
-rather than a third-party library because it is LightGBM's histogram-binned
-design \citep{ke2017lightgbm} implemented inside \code{scikit-learn}
+rather than a third-party library such as XGBoost \citep{chen2016xgboost}
+because it is LightGBM's histogram-binned design \citep{ke2017lightgbm}
+implemented inside \code{scikit-learn}
 \citep{sklearn2024hgb}, so it stays within the brief's toolset; because it
 handles missing values natively, which the cold-start track-record features
 need; and because it fits an order of magnitude faster than a comparable
@@ -113,7 +114,13 @@ validation period by maximising F1 --- which changes the decision without
 distorting the probability. Calibrated probabilities are a requirement rather
 than a nicety, because Section~\ref{sec:cost} multiplies them by a cost
 \citep{elkan2001cost}; they are reported, not assumed
-\citep{niculescu2005calibration}. No resampling is used anywhere.
+\citep{niculescu2005calibration}. No resampling is used anywhere
+\citep{chawla2002smote}. The split is chronological rather than stratified
+because a random or stratified split would train on the future; the positive
+rate of each period is reported instead -- late orders 8.8\%, 5.0\% and 7.4\%
+of the training, validation and test periods, low reviews 15.8\%, 11.4\% and
+11.0\% -- and the stratified, customer-grouped protocol is the contrast exhibit
+of Appendix~\ref{app:protocol}.
 
 A second alignment follows from Table~\ref{tab:levers}. PR-AUC summarises the
 whole ranking and is the right criterion for \emph{choosing} between models,

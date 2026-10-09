@@ -429,7 +429,30 @@ for tag, name in _c.items():
     S[f"lat_strike_{tag}_promise_days"] = r(st.loc[name, "promise_days"], 1)
 
 # ===========================================================================
-# 12. Deployment footprint
+# 12. Training, validation and test side by side (fit_diagnostics.py)
+# ===========================================================================
+tvt = need("train_val_test.csv")
+_short = {"train": "train", "validation": "val", "test": "test"}
+for _, row in tvt.iterrows():
+    tag = {"P1A lead time": "p1a", "P1B late flag": "p1b", "P2 low review": "p2"}[row["problem"]]
+    per = _short[row["period"]]
+    S[f"tvt_{tag}_{per}_n"] = int(row["n"])
+    if tag == "p1a":
+        S[f"tvt_{tag}_{per}_mae"] = r(row["mae"], 2)
+        S[f"tvt_{tag}_{per}_rmse"] = r(row["rmse"], 2)
+        S[f"tvt_{tag}_{per}_r2"] = r(row["r2"])
+    else:
+        for m in ("roc_auc", "pr_auc", "pr_auc_floor", "balanced_accuracy", "f1", "brier"):
+            S[f"tvt_{tag}_{per}_{m}"] = r(row[m])
+        S[f"tvt_{tag}_{per}_pr_auc_lift"] = r(row["pr_auc_lift"], 2)
+        S[f"tvt_{tag}_{per}_positive_rate_pct"] = r(100 * row["positive_rate"], 1)
+S["tvt_p1a_train_minus_val_mae"] = r(S["tvt_p1a_train_mae"] - S["tvt_p1a_val_mae"], 2)
+S["tvt_p2_train_minus_test_roc"] = r(S["tvt_p2_train_roc_auc"] - S["tvt_p2_test_roc_auc"])
+S["tvt_p2_val_minus_test_roc"] = r(S["tvt_p2_val_roc_auc"] - S["tvt_p2_test_roc_auc"])
+S["tvt_p1b_train_minus_test_roc"] = r(S["tvt_p1b_train_roc_auc"] - S["tvt_p1b_test_roc_auc"])
+
+# ===========================================================================
+# 13. Deployment footprint
 # ===========================================================================
 artifacts = sorted(config.MODELS_DIR.glob("*"))
 S["n_model_artifacts"] = len(artifacts)
