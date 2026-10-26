@@ -1,0 +1,887 @@
+\section{Reproducing this report}
+\label{app:repro}
+
+\begin{table}[htbp]
+\centering
+\caption{Everything in this document is generated. The order below is the order
+to run it in. The fitting step dominates; the rest takes a few minutes.}
+\label{tab:repro}
+\small
+\begin{tabular}{@{}p{5.4cm}p{9.4cm}@{}}
+\toprule
+\textbf{Command} & \textbf{What it produces} \\
+\midrule
+\code{pip install -r requirements-dev.txt} & The full analysis environment.
+\code{requirements.txt} alone is the deployment runtime \\[3pt]
+\code{python tests/test\_leakage.py} & \checkcount{} validation checks: join
+grain, the history construction against a brute-force recomputation, the leakage
+guard in both directions, split disjointness, Phase 1 backward compatibility,
+the capacity and lateness tables against recomputation, and --- added in this
+phase --- that the pickled models, the metadata, the hyperparameter table, the
+README and this report name the same deployed estimators \\[3pt]
+\code{python src/train\_models.py} & Fits every model, scores the test window
+once, writes \code{models/} and every result table into \code{report/results/} \\[3pt]
+\code{python src/capacity\_metrics.py} & Precision@$K$ and Recall@$K$ from the
+saved per-order test predictions (Section~\ref{sec:results-capacity}); nothing
+is refitted \\[3pt]
+\code{python src/lateness\_anatomy.py} & The weekly, monthly and strike-cohort
+lateness tables of Appendix~\ref{app:lateness} \\[3pt]
+\code{python src/fit\_diagnostics.py} & The three deployed models scored on the
+training, validation and test periods (Appendix~\ref{app:tvt}) \\[3pt]
+\code{python src/selection\_tables.py} & Every candidate's score on every
+out-of-sample window with its fold-to-fold spread (Appendix~\ref{app:protocol}),
+and the selected hyperparameters of every searched model and of the deployed
+ensembles' members, read from the pickles (Appendix~\ref{app:hyperparameters}) \\[3pt]
+\code{python src/pilot\_design.py} & The sizing of the outreach pilot
+(Section~\ref{sec:pilot}, Appendix~\ref{app:pilot}) \\[3pt]
+\code{python src/figures\_phase2.py} & Draws every modelling figure as vector
+PDF into \code{report/figures/} from those tables; the exploratory figures are
+drawn by notebooks 01--04 \\[3pt]
+\code{python src/phase3\_stats.py} & Distils every number quoted in this report
+into \code{report/stats\_phase3.txt} (it runs \code{phase2\_stats.py} first, so
+the Phase 2 contract is a subset). Diff it against the manuscript \\[3pt]
+\code{python src/report\_stats.py} & Reproduces every exploratory number of
+Section~\ref{sec:eda} into \code{report/stats.txt}, unchanged since Phase 1 ---
+the check that the later feature additions are backward compatible \\[3pt]
+\code{streamlit run deployment/app.py} & The application of
+Section~\ref{sec:deployment}; \code{dashboard/app.py} is the Community Cloud
+entry point and runs the same file \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:repro} is the run order. \code{SEED = 42} is set in every
+estimator, every randomised search and every subsample. Both requirements files
+pin exact versions on Python $\le$ 3.12, the
+interpreter every reported number was produced on. Model artifacts record the
+\code{scikit-learn} version that wrote them and \code{modeling.load\_model()}
+checks it on the way back in. The nine notebooks (01--04 exploratory, 05--09
+modelling, 10 the additions of this phase) are committed with their outputs.
+
+\section{Data model, cleaning decisions and dictionary}
+\label{app:dictionary}
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  font=\small,
+  box/.style={draw, rounded corners=2pt, minimum height=9mm, minimum width=25mm,
+              inner xsep=4pt, inner ysep=3pt, align=center},
+  spine/.style={box, very thick},
+  link/.style={draw, -{Latex[length=4pt]}, thin},
+  lbl/.style={font=\scriptsize, midway, fill=white, inner sep=1pt}
+]
+\node[spine] (ord) at (0,0) {\textbf{ORDERS}\\[-2pt]\scriptsize 99{,}441\\[-2pt]\scriptsize \textit{one row = one order}};
+
+\node[box] (cus) at (-4.3,1.5) {\textbf{CUSTOMERS}\\[-2pt]\scriptsize 99{,}441};
+\node[box] (itm) at (4.3,1.5) {\textbf{ORDER\_ITEMS}\\[-2pt]\scriptsize 112{,}650};
+\node[box] (pay) at (4.3,0) {\textbf{ORDER\_PAYMENTS}\\[-2pt]\scriptsize 103{,}886};
+\node[box] (rev) at (4.3,-1.5) {\textbf{ORDER\_REVIEWS}\\[-2pt]\scriptsize 99{,}224};
+
+\node[box] (prd) at (8.6,2.2) {\textbf{PRODUCTS}\\[-2pt]\scriptsize 32{,}951};
+\node[box] (sel) at (8.6,0.8) {\textbf{SELLERS}\\[-2pt]\scriptsize 3{,}095};
+\node[box] (cat) at (12.4,2.2) {\textbf{CATEGORY}\\[-2pt]\scriptsize \textbf{TRANSLATION} 71};
+\node[box] (geo) at (-4.3,-1.0) {\textbf{GEOLOCATION}\\[-2pt]\scriptsize 1{,}000{,}163};
+
+\draw[link] (cus) -- node[lbl]{1\,:\,1} (ord);
+\draw[link] (ord) -- node[lbl]{1\,:\,N} (itm);
+\draw[link] (ord) -- node[lbl]{1\,:\,N} (pay);
+\draw[link] (ord) -- node[lbl]{1\,:\,N} (rev);
+\draw[link] (itm) -- node[lbl]{N\,:\,1} (prd);
+\draw[link] (itm) -- node[lbl]{N\,:\,1} (sel);
+\draw[link] (prd) -- node[lbl]{N\,:\,1} (cat);
+\draw[link] (geo) -- node[lbl,align=center]{zip\\prefix} (cus);
+\end{tikzpicture}}
+\caption{The nine source tables. \code{ORDERS} is the analysis grain. The three
+one-to-many children (items, payments and reviews) are each aggregated to one
+row per order \emph{before} joining; merging them directly inflates the table by
+19\% and biases every average.}
+\label{fig:datamodel}
+\end{figure}
+
+\begin{table}[htbp]
+\centering
+\caption{Data quality audit and cleaning decisions, implemented as
+\code{CLEANING\_DECISIONS} in \code{src/data\_load.py}.}
+\label{tab:quality}
+\small
+\begin{tabular}{@{}p{2.7cm}p{4.7cm}p{6.3cm}@{}}
+\toprule
+\textbf{Issue} & \textbf{Evidence} & \textbf{Decision} \\
+\midrule
+One-to-many joins &
+112{,}650 items and 103{,}886 payments against 99{,}441 orders; a naive merge
+yields 118{,}437 rows &
+Aggregate each child table to one row per order, then join; assert the grain \\[3pt]
+Customer key &
+99{,}441 \code{customer\_id} values but 96{,}096 \code{customer\_unique\_id};
+2{,}997 people ordered more than once &
+Carry \code{customer\_unique\_id} and group on it for repeat behaviour and for
+splitting \\[3pt]
+Undelivered orders &
+2.98\% of orders have no delivery timestamp; status is \emph{delivered} for
+97.0\% &
+Delivery targets computed only for delivered orders; the rest are \code{NaN},
+never imputed \\[3pt]
+Review keys &
+\code{review\_id} is not unique (789 ids reused); 547 orders carry 2--3 reviews
+and 768 carry none &
+Key on \code{order\_id}, keep the earliest review; no review means \code{NaN} \\[3pt]
+Sparse review text &
+\code{review\_comment\_title} present for 11.7\% of reviews,
+\code{review\_comment\_message} for 41.3\% &
+Use \code{review\_score} only; coverage does not support NLP features \\[3pt]
+Geolocation grain &
+1{,}000{,}163 rows for 19{,}010 zip prefixes, including points outside Brazil &
+Collapse to a median coordinate per prefix; use it for great-circle distance \\[3pt]
+Missing product attributes &
+610 products (1.9\%) have no category &
+Label \code{unknown} rather than dropping orders; impute numerics in-pipeline \\[3pt]
+Coverage ramp &
+326 orders before 2017; final weeks truncated mid-cycle &
+Restrict to 2017-01-01 .. 2018-08-31 (99{,}091 orders) \\[3pt]
+Portuguese categories &
+71 category names &
+Translate to English for all output; keep the original key \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Candidate problems against the brief's scoping checklist
+(Section~\ref{sec:candidates}), as scored in Phase 1 with untuned probes.}
+\label{tab:checklist}
+\small
+\begin{tabular}{@{}p{2.5cm}p{4.1cm}p{3.6cm}p{3.5cm}@{}}
+\toprule
+\textbf{Criterion} & \textbf{C1 delivery (checkout)} & \textbf{C2 low review (delivery)} & \textbf{C3 repeat (checkout)} \\
+\midrule
+Derivable target & Yes, from order timestamps & Yes, \code{review\_score} $\le 2$ & Yes, next order by person \\
+No leakage & Yes, checkout regime & Yes, at-delivery regime & Yes, checkout regime \\
+Sufficient signal & Regression yes ($-41\%$ MAE); classification weak (1.6$\times$) & Yes, PR-AUC 0.40 vs 0.11 (3.6$\times$) & No, 2.0$\times$ at a 1.7\% base rate \\
+Manageable imbalance & 8.1\% late; PR-AUC and thresholds, no resampling & 14.6\% low; same handling & 2.6\%, too extreme \\
+Clear stakeholder & Operations & Customer experience & CRM \\
+\midrule
+\textbf{Verdict} & \textbf{Problem 1} & \textbf{Problem 2} & Rejected \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Data dictionary for the nine source tables. \emph{Null} is measured,
+not declared: Y means the column actually contains missing values in this
+extract, with the observed rate given.}
+\label{tab:dictionary}
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\code}[1]{\texttt{#1}}
+\begin{tabular}{@{}p{2.0cm}p{4.4cm}p{1.1cm}p{1.05cm}p{5.5cm}@{}}
+\toprule
+\textbf{Table} & \textbf{Column} & \textbf{Type} & \textbf{Null} & \textbf{Comment} \\
+\midrule
+\code{orders} & \code{order\_id} & text & N & Primary key. The analysis grain \\
+ & \code{customer\_id} & text & N & \textbf{Per-order} key, not a person \\
+ & \code{order\_status} & text & N & 8 values; \emph{delivered} for 97.0\% \\
+ & \code{order\_purchase\_timestamp} & datetime & N & The checkout prediction moment \\
+ & \code{order\_approved\_at} & datetime & Y 0.16\% & Post-checkout; excluded as a feature \\
+ & \code{order\_delivered\_carrier\_date} & datetime & Y 1.79\% & Post-outcome; splits lead time into seller and carrier share \\
+ & \code{order\_delivered\_customer\_date} & datetime & Y 2.98\% & Post-outcome; defines both delivery targets \\
+ & \code{order\_estimated\_delivery\_date} & date & N & Promised at checkout; \textbf{admissible}. Date only, 459 distinct values \\
+\midrule
+\code{order\_items} & \code{order\_id} & text & N & \textbf{1:N} --- 112,650 rows for 98,666 orders \\
+ & \code{order\_item\_id} & int & N & Sequence within the order, 1--21 \\
+ & \code{product\_id}, \code{seller\_id} & text & N & Foreign keys \\
+ & \code{shipping\_limit\_date} & datetime & N & Post-checkout; excluded \\
+ & \code{price}, \code{freight\_value} & float & N & Per item; summed to order level \\
+\midrule
+\code{order\_payments} & \code{order\_id} & text & N & \textbf{1:N}. One order has no payment row \\
+ & \code{payment\_sequential} & int & N & 1--29 \\
+ & \code{payment\_type} & text & N & 5 values; credit card 75.4\% \\
+ & \code{payment\_installments} & int & N & 0--24; $>1$ for 51.4\% of orders \\
+ & \code{payment\_value} & float & N & Summed to order level \\
+\midrule
+\code{order\_reviews} & \code{review\_id} & text & N & \textbf{Not unique} --- 789 ids reused across orders \\
+ & \code{order\_id} & text & N & \textbf{1:N}; 547 orders carry 2--3 reviews \\
+ & \code{review\_score} & int & N & 1--5; target of Problem 2 \\
+ & \code{review\_comment\_title} & text & Y 88.3\% & Too sparse to use \\
+ & \code{review\_comment\_message} & text & Y 58.7\% & Too sparse to use; no NLP features \\
+ & \code{review\_creation\_date} & date & N & Post-outcome for the review target \\
+ & \code{review\_answer\_timestamp} & datetime & N & Post-outcome \\
+\midrule
+\code{customers} & \code{customer\_id} & text & N & Joins 1:1 to orders \\
+ & \code{customer\_unique\_id} & text & N & \textbf{The actual person}; 96,096 of them. Grouping key for splits \\
+ & \code{customer\_zip\_code\_prefix} & int & N & Joins to geolocation \\
+ & \code{customer\_city}, \code{customer\_state} & text & N & 4,119 cities, 27 states \\
+\midrule
+\code{sellers} & \code{seller\_id} & text & N & 3,095 sellers \\
+ & \code{seller\_zip\_code\_prefix} & int & N & Joins to geolocation \\
+ & \code{seller\_city}, \code{seller\_state} & text & N & 59.7\% of sellers are in SP \\
+\midrule
+\code{products} & \code{product\_id} & text & N & 32,951 products \\
+ & \code{product\_category\_name} & text & Y 1.85\% & Portuguese; 73 values. Nulls labelled \emph{unknown} \\
+ & \code{product\_weight\_g} & float & Y 0.01\% & Summed to order level \\
+ & \code{product\_length/height/width\_cm} & float & Y 0.01\% & Combined into item volume \\
+ & \code{product\_photos\_qty} & float & Y 1.85\% & Listing-quality proxy \\
+\midrule
+\code{geolocation} & \code{geolocation\_zip\_code\_prefix} & int & N & 19,015 prefixes over 1,000,163 rows \\
+ & \code{geolocation\_lat}, \code{\_lng} & float & N & Collapsed to a median per prefix; out-of-Brazil points dropped \\
+\midrule
+\code{category\_} & \code{product\_category\_name} & text & N & Join key \\
+\code{translation} & \code{product\_category\_name\_english} & text & N & 71 translations \\
+\midrule
+\multicolumn{5}{@{}l@{}}{\textit{Derived in \code{src/} --- not present in any source file:}} \\
+derived & \code{delivery\_days} & float & Y & Purchase to arrival; target of 1A \\
+derived & \code{is\_late} & bool & Y & Arrival after the promised date; target of 1B \\
+derived & \code{distance\_km} & float & Y 1.2\% & Great-circle customer--seller distance \\
+derived & \code{estimated\_days} & float & N & Promised window in days \\
+derived & \code{lead\_category} & text & N & Category of the most expensive item \\
+derived & \code{freight\_ratio} & float & Y & Freight as a share of item value \\
+derived & \code{hist\_*} & float & Y & The eight as-of track records of Section~\ref{sec:history} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\section{Success criteria registered in advance}
+\label{app:bands}
+
+Written into \code{config.EXPECTED\_BANDS} before any model was tuned.
+\code{evaluate.check\_bands()} compares the headline results against them at the
+end of every training run and writes its verdicts to
+\code{report/results/bands.csv}. The alarm is direction-aware: for an error
+metric the suspicious end of the interval is the low one, for a score the high
+one, and confusing the two would point the check at the shortfalls and wave the
+leaks through.
+
+\begin{center}
+\small
+\begin{tabular}{@{}llp{2.4cm}p{5.0cm}r@{}}
+\toprule
+\textbf{Problem} & \textbf{Metric} & \textbf{Registered band} & \textbf{Where the range came from} & \textbf{Result} \\
+\midrule
+1A & MAE (days) & 3.3 -- 4.3 & Phase 1 reported 3.89 untuned & 3.898 \\
+1B & balanced accuracy & 0.58 -- 0.72 & Phase 1 reported 0.58 for a direct classifier & 0.705 \\
+1B & ROC-AUC & 0.72 -- 0.85 & Untuned scoping probe reached 0.79 for the derived route & 0.782 \\
+2 & balanced accuracy & 0.63 -- 0.74 & Phase 1 reported 0.69 & 0.681 \\
+2 & ROC-AUC & 0.70 -- 0.79 & Phase 1 reported 0.73 & 0.749 \\
+2 & PR-AUC & 0.34 -- 0.48 & Phase 1 reported 0.40 against a 0.11 floor & 0.414 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Hyperparameter search spaces and selected values}
+\label{app:hyperparameters}
+
+\begin{center}
+\scriptsize
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Family} & \textbf{Rung} & \textbf{Classification} & \textbf{Regression} \\
+\midrule
+A --- Linear     & 0 & \code{LogisticRegression} & \code{LinearRegression} \\
+                 & 1 & \code{LogisticRegression} ($\ell_2$, tuned $C$) & \code{Ridge} (tuned $\alpha$) \\
+B --- Tree-based & 0 & \code{DecisionTreeClassifier} & \code{DecisionTreeRegressor} \\
+                 & 1 & \code{RandomForestClassifier} & \code{RandomForestRegressor} \\
+                 & 2 & \code{HistGradientBoostingClassifier} & \code{HistGradientBoostingRegressor} \\
+C --- Ensemble   & 0 & \code{VotingClassifier} (soft, A+B) & \code{VotingRegressor} (A+B) \\
+                 & 1 & \code{StackingClassifier} (A+B) & \code{StackingRegressor} (A+B) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Every tuned model was searched with \code{RandomizedSearchCV} over the
+distributions of Table~\ref{tab:spaces}, scored by five-fold expanding-window
+cross-validation inside the training period: thirty draws per model, except the
+random forests, which get six because a forest costs one to two orders of
+magnitude more per fit and Phase 1 had already shown the forest and the boosted
+trees landing within 0.01 days of each other. Table~\ref{tab:selected} lists the
+values that won, which the Phase 2 report referred to but did not print; the
+deployed ensembles carry exactly their winning members' values, read back from
+the pickles, and the validation suite asserts it.
+
+\begin{table}[htbp]
+\centering
+\caption{Search spaces.}
+\label{tab:spaces}
+\small
+\begin{tabular}{@{}p{4.1cm}cp{7.9cm}@{}}
+\toprule
+\textbf{Model} & \textbf{Draws} & \textbf{Distributions} \\
+\midrule
+\code{LinearRegression} / \code{LogisticRegression} & --- &
+No free parameters. Fitted and scored under the same protocol so the row is
+comparable \\[3pt]
+\code{Ridge} & 30 & $\alpha \sim \mathrm{loguniform}(10^{-3}, 10^{3})$ \\[3pt]
+\code{LogisticRegression} ($\ell_2$) & 30 & $C \sim \mathrm{loguniform}(10^{-3}, 10^{2})$ \\[3pt]
+\code{DecisionTree} & 30 & \code{max\_depth} $\sim$ randint(3, 20) [classifier: (3, 16)];
+\code{min\_samples\_leaf} $\sim$ randint(5, 200) [classifier: (20, 400)];
+\code{max\_features} $\sim U(0.4, 1.0)$ \\[3pt]
+\code{RandomForest} & 6 & 150 trees; \code{max\_depth} $\sim$ randint(8, 18)
+[classifier: (6, 16)]; \code{min\_samples\_leaf} $\sim$ randint(20, 140)
+[classifier: (30, 180)]; \code{max\_features} $\sim U(0.15, 0.40)$ \\[3pt]
+\code{HistGradientBoosting} & 30 & \code{max\_iter} $\sim$ randint(120, 500);
+\code{learning\_rate} $\sim \mathrm{loguniform}(0.02, 0.3)$;
+\code{max\_leaf\_nodes} $\sim$ randint(15, 64);
+\code{min\_samples\_leaf} $\sim$ randint(10, 120);
+\code{l2\_regularization} $\sim \mathrm{loguniform}(10^{-4}, 10)$ \\[3pt]
+\code{Voting} & --- & Weights fixed at 1:2 in the tree's favour. A stated prior,
+not a tuned parameter: under drift the linear member is materially weaker and an
+equal blend would be worse than its better half \\[3pt]
+\code{Stacking} & --- & Meta-learner \code{Ridge}($\alpha=1$) /
+\code{LogisticRegression}($C=1$); inner CV five contiguous folds --- see the note below \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Selected hyperparameter values, from
+\code{report/results/hyperparameters.csv}. Members of the deployed ensembles are
+the rows marked $\dagger$; the stacked review model's meta-learner has
+coefficients 0.405 (linear member) and 5.572 (tree member).}
+\label{tab:selected}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llp{9.6cm}@{}}
+\toprule
+\textbf{Problem} & \textbf{Model} & \textbf{Selected values} \\
+\midrule
+1A & LinearRegression $\dagger$ & no free parameters \\
+1A & Ridge & $\alpha = 659.9$ \\
+1A & DecisionTree & depth 17, min leaf 158, max features 0.897 \\
+1A & RandomForest & 150 trees, depth 14, min leaf 107, max features 0.165 \\
+1A & HistGradientBoosting $\dagger$ & 433 iterations, learning rate 0.1065, 36 leaf nodes, min leaf 117, $\ell_2$ 9.142 \\
+1A & VotingRegressor $\dagger$ & weights 1:2 (linear : tree) \\
+\midrule
+1B & LogisticRegression ($\ell_2$) & $C = 0.004983$ \\
+1B & DecisionTree & depth 9, min leaf 290, max features 0.878 \\
+1B & RandomForest & 150 trees, depth 13, min leaf 132, max features 0.300 \\
+1B & HistGradientBoosting & 426 iterations, learning rate 0.07079, 21 leaf nodes, min leaf 30, $\ell_2$ 8.244 \\
+1B & derived route $\dagger$ & one-parameter logistic on the margin, fitted on validation; threshold 0.11 \\
+\midrule
+2 & LogisticRegression ($\ell_2$) $\dagger$ & $C = 8.431$ \\
+2 & DecisionTree & depth 14, min leaf 211, max features 0.963 \\
+2 & RandomForest & 150 trees, depth 12, min leaf 44, max features 0.349 \\
+2 & HistGradientBoosting $\dagger$ & 208 iterations, learning rate 0.02073, 28 leaf nodes, min leaf 18, $\ell_2$ 0.01789 \\
+2 & StackingClassifier $\dagger$ & meta-learner LogisticRegression($C = 1$); threshold 0.19 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{A compromise inside stacking, stated plainly.}
+\code{StackingClassifier} and \code{StackingRegressor} build their meta-features
+with \code{cross\_val\_\allowbreak predict}, which requires the inner folds to \emph{partition}
+the training set: every row must be predicted exactly once. An expanding window
+partitions nothing --- the earliest rows are never in a test fold --- so the
+closest valid approximation is unshuffled \code{KFold}, which at least keeps each
+fold contiguous in time. The meta-learner is consequently fitted on out-of-fold
+predictions partly made by models trained on later orders. The residual optimism
+is confined to the meta-learner's coefficients; the base models are refitted on
+the whole training period afterwards, and the outer protocol scoring the
+finished ensemble is still the expanding window. It matters less than it
+otherwise would because of how the result lands: the ensemble is
+\emph{flattered} by this arrangement and still does not separate from the
+boosted trees, which makes the conclusion in
+Section~\ref{sec:results-ensemble} safer rather than weaker.
+
+\section{Re-checking a Phase 1 claim about least squares}
+\label{app:encoding}
+
+Phase 1 reported that ordinary least squares was unusable on this design matrix
+--- ``rank-deficient, so its coefficients explode''. Phase 2 re-ran it four ways.
+The observation reproduces exactly; the conclusion drawn from it needed
+correcting.
+
+\begin{table}[htbp]
+\centering
+\caption{Reproducible via \code{report/results/encoding\_diagnostic.csv}. The
+deficiency is exactly four --- one per categorical, because each one-hot block
+sums to one and is therefore collinear with the intercept.}
+\label{tab:encoding}
+\small
+\begin{tabular}{@{}lccrrr@{}}
+\toprule
+\textbf{Encoding} & \textbf{rank / cols} & \textbf{deficiency} &
+\textbf{max $|\beta|$} & \textbf{CV MAE} & \textbf{test MAE} \\
+\midrule
+OLS, full one-hot block   & 101 / 105 & 4 & $2.7\times10^{13}$ & $3.9\times10^{11}$ & 4.181 \\
+OLS, one level dropped    & 101 / 101 & 0 & 14.7  & 5.242 & 4.181 \\
+Ridge, full one-hot block & 101 / 105 & 4 & 9.82  & 5.241 & 4.182 \\
+Ridge, one level dropped  & 101 / 101 & 0 & 12.5  & 5.240 & 4.183 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Least squares still returns a minimum-norm solution and its \emph{predictions}
+are fine --- 4.181 days on the test window, indistinguishable from Ridge. What is
+not fine is the coefficient vector at $10^{13}$, and the cancellation holding it
+together is fragile enough to fail on one of five expanding-window folds, which
+is why the cross-validated error is astronomical while the single-split test
+error looks healthy. Dropping one level per categorical restores full rank, so
+the linear family is encoded that way; the compromise is that a level unseen in
+training is scored as the reference level, which affects a handful of test
+orders with a payment type absent from training. Once the design is full rank,
+Ridge and OLS agree to three decimals: regularisation buys numerical stability
+here, not accuracy.
+
+\section{Full result tables}
+\label{app:tables}
+
+The body reports the models that matter. The complete tables --- every model,
+every metric, cross-validated, validation and test scores side by side --- are
+written to \code{report/results/}:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{}p{5.2cm}p{9.6cm}@{}}
+\toprule
+\textbf{File} & \textbf{Contents} \\
+\midrule
+\code{reg\_p1a.csv} & Problem 1A: baselines, both ladders, ensembles; MAE, RMSE, $R^2$ \\
+\code{clf\_p1b.csv} & Problem 1B: five direct classifiers and two derived routes \\
+\code{clf\_p2.csv} & Problem 2: both ladders and both ensembles, all metrics \\
+\code{selection\_*.csv}, \code{cv\_folds.csv} & Every candidate on every out-of-sample window, its ranks, and the fold-to-fold spread (Appendix~\ref{app:protocol}) \\
+\code{hyperparameters.csv} & Selected values of every searched model and of the deployed ensembles' members (Appendix~\ref{app:hyperparameters}) \\
+\code{encoding\_diagnostic.csv} & The Phase 1 re-check of Table~\ref{tab:encoding} \\
+\code{cv\_protocol.csv} & Temporal against shuffled CV against the forward test \\
+\code{weight\_ablation.csv} & Class weighting: discrimination and calibration \\
+\code{calibration\_p2.csv}, \code{threshold\_sweep\_p2.csv} & Reliability and the operating-point sweep \\
+\code{cost\_p2.csv}, \code{cost\_p1b.csv} & Expected net benefit by threshold \\
+\code{perm\_p1a.csv}, \code{perm\_p2.csv} & Permutation importance on the test window \\
+\code{segments\_*.csv} & Performance by region, category and test month \\
+\code{predictions\_*.csv} & Per-order test predictions, from which the figures and the application's replay are drawn \\
+\code{bands.csv} & Headline metrics against the bands registered in advance \\
+\code{capacity\_*.csv} & Precision@$K$ and Recall@$K$, pooled and per day, for both flags \\
+\code{lateness\_*.csv} & The lateness anatomy of Appendix~\ref{app:lateness} \\
+\code{train\_val\_test.csv} & The deployed models on the training, validation and test periods (Appendix~\ref{app:tvt}) \\
+\code{pilot\_design.csv}, \code{pilot\_breakeven.csv} & The outreach pilot sizing (Appendix~\ref{app:pilot}) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{The cross-validation protocol, and every candidate on every window}
+\label{app:protocol}
+
+\begin{table}[htbp]
+\centering
+\caption{One model, three protocols. Raw average precision disagrees; the same
+numbers divided by each period's no-skill floor do not.
+Figure~\ref{fig:protocol}.}
+\label{tab:protocol}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Protocol} & \textbf{PR-AUC} & \textbf{fold spread} & \textbf{no-skill floor} & \textbf{lift} \\
+\midrule
+\code{TimeSeriesSplit}, expanding window & 0.562 & $\pm$0.091 & 0.158 & 3.55$\times$ \\
+\code{StratifiedGroupKFold}, shuffled    & 0.580 & $\pm$0.006 & 0.158 & 3.66$\times$ \\
+Forward test window --- the truth        & 0.414 & ---        & 0.110 & 3.75$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Both cross-validated estimates in Table~\ref{tab:protocol} sit about 0.16 above
+the forward result, which looks like catastrophic optimism --- and almost all
+of it is mechanical. Average
+precision's no-skill baseline \emph{is} the positive rate
+\citep{saito2015prplot}, and the low-review rate falls from 15.8\% inside the
+training period to 11.0\% in the test window; normalised by that floor the three
+agree to within 0.2 of a multiple. \textbf{Raw PR-AUC is not comparable across
+periods with different base rates; its lift over the floor is} --- and quoting
+the raw number alone would have supported either a claim of severe overfitting or
+a claim of none. The shuffled protocol adds a second warning: its fold-to-fold
+spread is $\pm$0.006 against the temporal protocol's $\pm$0.091, an interval
+fifteen times narrower on an estimate no closer to the truth.
+
+\begin{table}[htbp]
+\centering
+\caption{Every Problem 2 candidate on every out-of-sample window (PR-AUC), from
+\code{report/results/cv\_folds.csv}; the standard deviation is over the five
+expanding folds. ``Rank'' is the mean rank over the three most recent windows
+(folds 4, 5 and validation), the selection criterion of
+Section~\ref{sec:cv}. Figure~\ref{fig:cvfolds}. The same table for Problems 1A
+and 1B is in the CSV.}
+\label{tab:cvfolds}
+\scriptsize
+\setlength{\tabcolsep}{2.6pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lrrrrrrrrrr@{}}
+\toprule
+\textbf{Model} & \textbf{fold 1} & \textbf{fold 2} & \textbf{fold 3} & \textbf{fold 4} & \textbf{fold 5} & \textbf{val.} & \textbf{mean $\pm$ sd} & \textbf{test} & \textbf{rank} \\
+\midrule
+StackingClassifier (A+B) \emph{deployed} & 0.413 & 0.537 & 0.617 & 0.660 & 0.614 & 0.409 & 0.568 $\pm$ 0.087 & 0.414 & 1.67 \\
+HistGradientBoosting   & 0.411 & 0.539 & 0.618 & 0.660 & 0.613 & 0.407 & 0.568 $\pm$ 0.088 & 0.415 & 2.00 \\
+RandomForest           & 0.404 & 0.544 & 0.622 & 0.654 & 0.616 & 0.403 & 0.568 $\pm$ 0.089 & 0.405 & 2.67 \\
+VotingClassifier (A+B) & 0.413 & 0.526 & 0.611 & 0.650 & 0.604 & 0.404 & 0.561 $\pm$ 0.084 & 0.407 & 3.67 \\
+DecisionTree           & 0.380 & 0.510 & 0.595 & 0.640 & 0.592 & 0.389 & 0.543 $\pm$ 0.092 & 0.396 & 5.00 \\
+LogisticRegression ($\ell_2$) & 0.306 & 0.416 & 0.534 & 0.574 & 0.497 & 0.320 & 0.466 $\pm$ 0.095 & 0.291 & 6.33 \\
+LogisticRegression     & 0.307 & 0.416 & 0.534 & 0.574 & 0.497 & 0.320 & 0.465 $\pm$ 0.095 & 0.291 & 6.67 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Table~\ref{tab:cvfolds} is what the Phase 2 evaluation asked for. Read down a
+column, the windows differ far more than the models: every candidate is at its
+worst on the first fold (early 2017, few orders, a 20\% low-review rate) and at
+its best on the fourth. Read across a row, the three tree-based rungs are within
+0.0004 of one another on the cross-validated mean against a fold-to-fold
+standard deviation of 0.09; the stacked ensemble is ahead of the single boosted
+model on three of the six windows and behind on three. Cross-validation cannot
+order them, which is why the rank rule was fixed before any test score was seen
+and why the deployed choice is reported as a tie resolved by that rule rather
+than as a win.
+
+\section{Lateness anatomy: where the late deliveries came from}
+\label{app:lateness}
+
+Phase 1 read the monthly late-rate series and attributed its spikes to Black
+Friday and to the May 2018 truckers' strike. The Phase 1 feedback pointed out
+that the figure does not support the second claim --- the largest peaks are
+February and March 2018, and May is unremarkable --- and asked for a source and
+a more careful link. \code{src/lateness\_anatomy.py} is that analysis, at three
+resolutions, and Figure~\ref{fig:lateness} draws it.
+
+\paragraph{Weekly, not monthly.} A ten-day event cannot be resolved by a
+monthly series. In Monday-to-Sunday purchase weeks the strike of 21 May to
+1 June 2018 \citep{bloomberg2018strike} --- nationwide road blockades, during
+which Correios suspended its time-definite Sedex services and added five
+business days to standard parcels \citep{tecnoblog2018correios} --- is plainly
+visible, but one week \emph{earlier} than a naive reading expects: orders placed
+on 14--20 May were promised 19.5 days under normal conditions and were in
+transit when the roads closed, and 16.0\% of them arrived late against a 5.0\%
+average over the preceding five weeks. Of all orders in transit during the
+strike (4{,}228), 16.9\% were late, against 0.4\% for the May orders delivered
+before it (Table~\ref{tab:strike}). What the monthly series records instead is
+the platform's reaction: order volume in the strike week halved, the promised
+window for orders placed that week rose to 25.3 days and in the following week
+to 36.8, and the late rate of those orders was 5.5\% and 0.4\%. That is why June
+2018, at 1.4\%, is the quietest month in the data.
+
+\paragraph{February--March 2018 is a different mechanism.} Panel (b) of
+Figure~\ref{fig:lateness} splits lead time at the carrier handoff. Outside the
+peak, sellers hand parcels to the carrier in about 3.2 days and the carrier
+takes 8.7 more; in February--March 2018 the seller's share was unchanged at
+3.4 days while the carrier's rose to 13.2, in every customer region. At the
+same time the promised window was \emph{tightened}, from 26.3 days in January
+to 22.0 in March --- within the S\~{a}o Paulo to S\~{a}o Paulo route alone, from
+20.1 to 15.2 days --- so the slack that normally absorbs a slow fortnight was
+removed exactly when it was needed. The late rate peaked at 29.0\% in the week
+of 26 February, the promise was lengthened again from the week of 9 April, and
+by that week the late rate was back under 5\%. The data do not identify the
+external cause of the carrier slowdown and we do not assert one; what they do
+establish is that it was carrier-side, network-wide and compounded by a
+promising decision, which is the careful form of the claim Phase 1 made loosely.
+
+\begin{table}[htbp]
+\centering
+\caption{The cohorts around the strike, from
+\code{report/results/lateness\_strike.csv}. Carrier days run from the carrier
+handoff to the doorstep; the promise is the window quoted at checkout.}
+\label{tab:strike}
+\footnotesize
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Cohort} & \textbf{orders} & \textbf{late} & \textbf{carrier days} & \textbf{promise, days} \\
+\midrule
+Bought 1--20 May, delivered before the strike & 2{,}749 & 0.4\%  & 4.8  & 19.5 \\
+In transit during the strike                  & 4{,}228 & 16.9\% & 13.1 & 25.5 \\
+Bought during the strike, 21 May--1 June      & 1{,}502 & 3.5\%  & 9.2  & 29.4 \\
+Bought 2--30 June                             & 5{,}912 & 1.4\%  & 6.7  & 27.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\section{Responses to the Phase 1 and Phase 2 feedback}
+\label{app:feedback}
+
+Both rounds of evaluator feedback were treated as specifications.
+Tables~\ref{tab:feedback1} and \ref{tab:feedback2} list each point and the
+section, table or figure of this report that acts on it.
+
+\begin{center}
+\begin{minipage}{\linewidth}
+\centering
+\captionof{table}{Phase 1 feedback (on the literature review, the exploratory
+analysis and the dashboard) and where this report acts on it.}
+\label{tab:feedback1}
+\small
+\begin{tabular}{@{}p{4.4cm}p{10.1cm}@{}}
+\toprule
+\textbf{Feedback} & \textbf{Response} \\
+\midrule
+Survey-based perceived quality and platform ratings were treated as one construct &
+Sections~\ref{sec:lit} and \ref{sec:problem} separate them, cite the
+self-selection literature \citep{hu2009jshaped, hu2017selfselection,
+dellarocas2003digitization}, and define the target as the platform rating;
+Section~\ref{sec:limitations} carries the consequence \\[2pt]
+Model choices cited original algorithm papers rather than e-commerce
+applications; no comparison within the tree family; HistGradientBoosting not
+justified &
+Section~\ref{sec:lit} argues the rungs from the empirical comparisons and from
+e-commerce applications, including three studies on this dataset, and states
+why HistGradientBoosting; the ladder results of Section~\ref{sec:results} are
+the within-family comparison \\[2pt]
+Features not supported by literature &
+Section~\ref{sec:features} cites the support for each feature group and uses
+the correlation matrix as the empirical screen; Appendix~\ref{app:features}
+gives a rationale per feature \\[2pt]
+Problem 2 should be evaluated under limited capacity, with Precision@$K$ and
+Recall@$K$ &
+Section~\ref{sec:results-capacity}, Table~\ref{tab:capacity} and
+Figure~\ref{fig:capacity}; the operating point in Section~\ref{sec:cost} is a
+capacity; the application returns a top-$K$ triage list and replays any test
+day \\[2pt]
+Figure 3 attributed the late-rate peaks to the May 2018 strike; the strike
+needed a source &
+Section~\ref{sec:eda-lateness}, Appendix~\ref{app:lateness} and
+Figure~\ref{fig:lateness}: the peaks are February--March 2018; the strike is
+cited \citep{bloomberg2018strike, tecnoblog2018correios}, shown at weekly
+resolution, and its effect traced through the promised window \\[2pt]
+Figure 5a omitted S\~{a}o Paulo; ``roughly triples''; Figure 8 not referenced &
+Figure~\ref{fig:geography}a redrawn (the notebook had taken the first eight
+states alphabetically); growth is about eight-fold
+(Section~\ref{sec:temporal}); the correlation matrix is discussed in
+Sections~\ref{sec:eda} and \ref{sec:features} \\[2pt]
+Candidate 1 named a stakeholder without saying how the team would use the
+prediction &
+Table~\ref{tab:levers} and Section~\ref{sec:stakeholders}: four levers ordered
+by cost, each with its trigger and the evidence behind it \\[2pt]
+Dashboard inaccessible &
+Redeployed from the team's current repository under a new URL;
+Section~\ref{sec:deployment} explains how it stays reachable \\
+\bottomrule
+\end{tabular}
+\end{minipage}
+\end{center}
+
+\begin{center}
+\begin{minipage}{\linewidth}
+\centering
+\captionof{table}{Phase 2 feedback (on the modelling report) and where this
+report acts on it.}
+\label{tab:feedback2}
+\small
+\begin{tabular}{@{}p{4.4cm}p{10.1cm}@{}}
+\toprule
+\textbf{Feedback} & \textbf{Response} \\
+\midrule
+Report CV scores with their fold-to-fold variation for the Problem 2
+candidates &
+Table~\ref{tab:review} now carries the mean $\pm$ standard deviation over the
+five folds for every candidate (and Table~\ref{tab:reg} for the regression);
+Table~\ref{tab:cvfolds} and Figure~\ref{fig:cvfolds} show every candidate on
+every window; Section~\ref{sec:results-review} interprets the spread; the
+model card shows the same table \\[2pt]
+State the deployed Problem 2 model clearly and consistently; justify the
+choice &
+Section~\ref{sec:results-ensemble} and Table~\ref{tab:deployed}: the
+StackingClassifier, as pickled, with the justification; the README, the model
+card and this text are tied to the artifact by a validation check \\[2pt]
+Refer to Figure 3 in the text; the selected hyperparameter values were said to
+be in Appendix C but were not &
+Every figure in Appendix~\ref{app:figures} is referred to from the body; the
+selected values are in Table~\ref{tab:selected}, generated from the results
+tables and the deployed pickles \\[2pt]
+The expected benefit assumes that contacting a customer prevents the low
+review; state it as a limitation and propose a pilot or A/B test &
+Section~\ref{sec:limitations} states it; Section~\ref{sec:pilot},
+Appendix~\ref{app:pilot} and Figure~\ref{fig:pilot} design and size the
+randomised pilot; the model card carries a calculator for it \\
+\bottomrule
+\end{tabular}
+\end{minipage}
+\end{center}
+
+\section{Training, validation and test side by side}
+\label{app:tvt}
+
+The results tables carry cross-validated, validation and test columns. The
+in-sample fit on the training period is the missing fourth view, and it is what
+separates over-fitting from drift: a model that has memorised its training
+period collapses between training and validation, while a model facing a
+changed world drops between validation and test, or in step with the base rate.
+\code{src/fit\_diagnostics.py} scores the three deployed artifacts on all three
+periods without refitting anything.
+
+\begin{table}[htbp]
+\centering
+\caption{The deployed models on the training, validation and test periods.
+Thresholds and the margin-to-risk mapping are the ones fitted on the validation
+period and shipped. Lift is PR-AUC divided by that period's own positive rate.}
+\label{tab:tvt}
+\footnotesize
+{\setlength{\tabcolsep}{2.3pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}llrrrrrrrr@{}}
+\toprule
+\textbf{Model} & \textbf{Period} & \textbf{$n$} & \textbf{MAE} & \textbf{RMSE} & \textbf{$R^2$} & & & & \\
+\midrule
+P1A lead time (Voting)      & training   & 70{,}617 & 4.718 & 7.807 & 0.408 & & & & \\
+                            & validation & 12{,}957 & 4.784 & 6.592 & 0.222 & & & & \\
+                            & test       & 12{,}630 & 3.898 & 5.342 & 0.009 & & & & \\
+\midrule
+ & & \textbf{$n$} & \textbf{positives} & \textbf{ROC-AUC} & \textbf{PR-AUC} & \textbf{lift} & \textbf{bal.\ acc} & \textbf{F1} & \textbf{Brier} \\
+\midrule
+P1B late flag (derived)     & training   & 70{,}617 & 8.8\%  & 0.803 & 0.396 & 4.48$\times$ & 0.713 & 0.391 & 0.068 \\
+                            & validation & 12{,}957 & 5.0\%  & 0.787 & 0.166 & 3.34$\times$ & 0.648 & 0.227 & 0.044 \\
+                            & test       & 12{,}630 & 7.4\%  & 0.782 & 0.214 & 2.89$\times$ & 0.705 & 0.235 & 0.066 \\
+\midrule
+P2 low review (Stacking)    & training   & 72{,}380 & 15.8\% & 0.836 & 0.617 & 3.90$\times$ & 0.754 & 0.601 & 0.089 \\
+                            & validation & 13{,}094 & 11.4\% & 0.762 & 0.409 & 3.60$\times$ & 0.678 & 0.436 & 0.083 \\
+                            & test       & 12{,}855 & 11.0\% & 0.749 & 0.414 & 3.75$\times$ & 0.681 & 0.470 & 0.078 \\
+\bottomrule
+\end{tabular}}}
+\end{table}
+
+Three readings. \textbf{The lead-time blend does not memorise its training
+period}: its in-sample MAE, 4.72 days, is level with the validation period's
+4.78 and \emph{above} the test window's 3.90, and the fall in $R^2$ from 0.41
+in-sample to 0.01 on test is the test period's small variance rather than a
+large error --- the level shift of Section~\ref{sec:limitations}, not
+over-fitting. \textbf{The derived late flag is stable}: ROC-AUC 0.80, 0.79, 0.78
+across the three periods, while its lift over the floor falls from 4.5$\times$
+to 2.9$\times$ only because the floor itself moves with the late rate.
+\textbf{The stacking ensemble shows the expected, modest in-sample optimism of a
+tree ensemble}: ROC-AUC 0.84 on the period it was fitted to against 0.76 and
+0.75 on the two it never saw, and PR-AUC 0.62 against 0.41 --- but validation
+and test agree with each other (lift 3.6$\times$ and 3.75$\times$, Brier
+improving from 0.089 to 0.078 as the base rate falls), which is the comparison
+that governs deployment.
+
+\section{Feature catalogue}
+\label{app:features}
+
+Every feature, with its definition, the reason it is in the model and the
+moment it becomes knowable. Literature pointers are to the works discussed in
+Section~\ref{sec:lit}; empirical pointers are to Section~\ref{sec:eda}. All 36
+are built by \code{src/features.py} from the nine tables alone.
+
+{\footnotesize
+\renewcommand{\code}[1]{\texttt{#1}}
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{@{}p{3.3cm}p{3.9cm}p{6.6cm}p{1.2cm}@{}}
+\caption{The 36 features by group. ``Checkout'' features are admissible for
+both problems; ``delivery'' features only for Problem 2.}
+\label{tab:features} \\
+\toprule
+\textbf{Feature} & \textbf{Definition} & \textbf{Why it is in the model} & \textbf{Known at} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Feature} & \textbf{Definition} & \textbf{Why it is in the model} & \textbf{Known at} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\multicolumn{4}{@{}l}{\textit{The promise (2)}} \\
+\code{estimated\_days} & promised delivery date minus purchase time, days & the platform's own routing knowledge, shown to the customer at checkout; strongest single correlate of lead time after distance ($r = 0.38$) and a decision variable in its own right \citep{cui2024promise, salari2022delivery} & checkout \\
+\code{long\_promise} & promised window above the pinned median of 23.2 days & flags the routes the platform itself expects to be slow; pinned so serving and training use the same cut & checkout \\
+\multicolumn{4}{@{}l}{\textit{Basket and money (11)}} \\
+\code{n\_items}, \code{n\_sellers} & items and distinct sellers in the order & multi-item and multi-seller orders consolidate before shipping; order composition is the standard control in order-level logistics studies \citep{deshpande2023logistics} & checkout \\
+\code{is\_multi\_seller} & more than one seller & split shipments wait for the slowest seller & checkout \\
+\code{log\_price} & $\log(1 + \text{item total})$ & money is right-skewed; the log stabilises the linear family; price relates to the rating, not to lead time (Figure~\ref{fig:correlations}) & checkout \\
+\code{price\_per\_item} & item total divided by items & separates one expensive item from many cheap ones & checkout \\
+\code{total\_freight} & freight paid, R\$ & the platform's own pricing of distance and bulk & checkout \\
+\code{freight\_ratio} & freight divided by item total & the delivery cost as the customer experiences it, relative to the purchase & checkout \\
+\code{log\_weight}, \code{max\_volume\_cm3} & $\log(1 + \text{total weight})$; bulkiest item's volume & handling and carrier constraints; physical attributes are standard delivery-time inputs \citep{salari2022delivery} & checkout \\
+\code{total\_photos} & listing photos across the items & a listing-quality proxy for the expectation gap behind a low rating & checkout \\
+\code{max\_installments} & largest instalment count & payment behaviour and an affordability signal characteristic of this market & checkout \\
+\multicolumn{4}{@{}l}{\textit{Calendar (6)}} \\
+\code{purchase\_month}, \code{purchase\_dow}, \code{purchase\_hour} & month, weekday, hour of purchase & seasonality and the weekly and daily rhythm of fulfilment (Figure~\ref{fig:rhythm}); the usual calendar encodings for transactional data \citep{kuhn2019feature, heaton2016feature} & checkout \\
+\code{is\_weekend}, \code{is\_business\_hours} & weekend; 09:00--18:00 & an order placed outside working hours waits for the next handling day & checkout \\
+\code{is\_nov\_peak} & purchased on or after 20 November & the Black Friday surge stresses fulfilment: the late rate reached 14.3\% in November 2017 (Section~\ref{sec:eda-lateness}) & checkout \\
+\multicolumn{4}{@{}l}{\textit{Geography (4)}} \\
+\code{log\_distance} & $\log(1 + \text{km})$ between postcode centroids & the strongest checkout-time correlate of lead time ($r = 0.39$); distance is the backbone of delivery-time models \citep{liu2021lastmile} & checkout \\
+\code{same\_state} & seller and customer in the same state & the cheapest route class; only 35.7\% of orders & checkout \\
+\code{customer\_state} & destination state (27 levels) & regional logistics; rare levels pooled by the encoder & checkout \\
+\code{seller\_region} & origin region (5 levels) & origin logistics, collapsed from 27 states so the linear family is not swamped by sparse levels & checkout \\
+\multicolumn{4}{@{}l}{\textit{Catalogue and payment (2)}} \\
+\code{lead\_category} & category of the most expensive item (74 levels, rare ones pooled) & product type drives both handling and expectations; the category's effect is otherwise invisible to the model & checkout \\
+\code{lead\_payment\_type} & payment method of the largest payment & a boleto is paid at a bank and clears days after a card, so handling starts later; the top permutation feature for lead time (Section~\ref{sec:insight}) & checkout \\
+\multicolumn{4}{@{}l}{\textit{Track records (8), each an as-of aggregate over orders that had closed before this one was placed}} \\
+\code{hist\_seller\_\allowbreak lead\_days}, \code{hist\_seller\_\allowbreak late\_rate}, \code{hist\_seller\_\allowbreak low\_review\_rate} & the seller's mean lead time, late rate and 1--2 star rate over at least five earlier orders & a party's past performance is the standard predictor in supply-chain delay models \citep{baryannis2019risk}; the time-respecting form of target encoding \citep{miccibarreca2001target} & checkout \\
+\code{hist\_seller\_n} & number of earlier orders the seller estimate rests on & cold start as information: the model can discount a seller it has barely seen & checkout \\
+\code{hist\_route\_\allowbreak lead\_days} & mean lead time on the seller-state to customer-state route & origin--destination history, the route-level analogue of the above \citep{salari2022delivery} & checkout \\
+\code{hist\_category\_\allowbreak low\_review\_rate} & the category's past 1--2 star rate & categories differ in how often they disappoint; encoded without seeing the future & checkout \\
+\code{hist\_platform\_\allowbreak lead\_days}, \code{hist\_platform\_\allowbreak late\_rate} & platform-wide trailing 28-day mean lead time and late rate & the drift tracker: tells the model how fast the network is running right now \citep{gama2014drift} & checkout \\
+\multicolumn{4}{@{}l}{\textit{Delivery outcome (3), Problem 2 only}} \\
+\code{delivery\_days}, \code{delay\_vs\_\allowbreak estimate\_days}, \code{is\_late} & realised lead time; days late against the promise; late flag & the dominant driver of a 1--2 star review, 9.2\% to 54.0\% (Section~\ref{sec:reviews}; \citealt{deshpande2023logistics}); known once the parcel has arrived and forbidden before & delivery \\
+\end{longtable}}
+
+\section{The outreach pilot}
+\label{app:pilot}
+
+\begin{table}[htbp]
+\centering
+\caption{Pilot size by assumed effect, from \code{report/results/pilot\_design.csv}.
+The control-arm rate is the model's precision at that daily capacity on the
+test window; $n$ is orders per arm for a two-sided two-proportion test at
+$\alpha = 0.05$; duration assumes $K$ contacts a day split evenly across the
+arms; net benefit per contact is under the R\$5 : R\$40 assumption.
+Figure~\ref{fig:pilot}.}
+\label{tab:pilot}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}rrrrrrrr@{}}
+\toprule
+\textbf{$K$/day} & \textbf{control} & \textbf{reduction} & \textbf{treated} & \textbf{$n$/arm (80\%)} & \textbf{wks (80\%)} & \textbf{wks (90\%)} & \textbf{net/contact} \\
+\midrule
+10 & 0.572 & 15\% & 0.486 & 531 & 16 & 21 & $-$R\$1.57 \\
+10 & 0.572 & 20\% & 0.457 & 299 & 9  & 12 & $-$R\$0.43 \\
+10 & 0.572 & \textbf{21.9\% (break-even)} & 0.447 & 250 & 8 & --- & R\$0.00 \\
+10 & 0.572 & 25\% & 0.429 & 191 & 6  & 8  & R\$0.72 \\
+10 & 0.572 & 30\% & 0.400 & 133 & 4  & 6  & R\$1.86 \\
+10 & 0.572 & 40\% & 0.343 & 74  & 3  & 3  & R\$4.15 \\
+\midrule
+20 & 0.440 & 20\% & 0.352 & 484 & 7  & 10 & $-$R\$1.48 \\
+20 & 0.440 & \textbf{28.4\% (break-even)} & 0.315 & 235 & 4 & --- & R\$0.00 \\
+20 & 0.440 & 30\% & 0.308 & 210 & 3  & 5  & R\$0.28 \\
+20 & 0.440 & 40\% & 0.264 & 115 & 2  & 3  & R\$2.04 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The design randomises inside the top-$K$ list, so both arms share the same
+predicted risk and the comparison is a fair one. Two things follow from the
+table that a verbal recommendation would miss. The break-even effect grows with
+capacity --- 21.9\% at ten contacts a day, 28.4\% at twenty, 42.1\% at forty ---
+because precision falls as the list is worked deeper, so a contact lower down
+has less to prevent; a pilot should therefore run at the capacity that would
+actually be deployed. And the pilot is short at the effect sizes that matter:
+six weeks detects a one-in-four reduction at ten contacts a day, while an effect
+too small to pay for itself would take sixteen weeks to confirm, which is itself
+informative --- if the pilot has not found an effect in two months, the policy
+should not be scaled.
+
+\section{Contributions}
+\label{app:contributions}
+
+\begin{center}
+\small
+\begin{tabular}{@{}lp{11.2cm}@{}}
+\toprule
+\textbf{Member} & \textbf{Contribution} \\
+\midrule
+Pan Pinyou & Problem scoping and stakeholder framing; feature engineering for the
+track-record features; business interpretation, the cost analysis and the pilot
+design; report Sections~\ref{sec:problem}, \ref{sec:features} and
+\ref{sec:insight}; presentation slides \\[3pt]
+Li Yudan & Literature review and its revision; modelling pipeline and the family
+ladders; hyperparameter search; imbalance, calibration and fold-to-fold
+analysis; report Sections~\ref{sec:lit}, \ref{sec:method} and
+\ref{sec:results-review} \\[3pt]
+Zhu Gengyu & Data pipeline and the leakage guard; exploratory analysis and the
+lateness anatomy; cross-validation protocol and the direct-against-derived
+comparison; dashboard, deployment, tests and reproducibility; report
+Sections~\ref{sec:data}, \ref{sec:eda}, \ref{sec:results-reg},
+\ref{sec:deployment} and \ref{sec:limitations} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+All three members reviewed every section and verified the reported numbers
+against \code{report/stats\_phase3.txt} and \code{report/stats.txt}.

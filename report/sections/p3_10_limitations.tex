@@ -1,0 +1,84 @@
+\section{Limitations and Conclusion}
+\label{sec:limitations}
+
+\paragraph{The models are fitted on a moving target.}
+Mean lead time falls 5.34 days between training and test, and a model fitted on
+the slower past is systematically off-level on the faster present ---
+Section~\ref{sec:results-segments} measures that as a positive bias in every
+region. Hence $R^2$ against a test-period variance is negative even for a useful
+model, which is why MAE leads, and hence the models need refitting on a rolling
+basis rather than once \citep{gama2014drift}; calibration belongs in the same
+cycle, because a calibration fitted on one prior drifts as the prior does.
+
+\paragraph{The largest driver of lateness is not observable at prediction time.}
+The late rate swings between 1.4\% and 21.4\% month to month, and
+Section~\ref{sec:eda-lateness} traces the swings to a Black Friday surge, a
+carrier-side slowdown that coincided with a tightened promise, and a national
+strike absorbed into a longer promised window: shocks to carrier capacity or to
+the platform's own promising policy, none an attribute of an order. This, not
+the choice of algorithm, is the binding constraint on Problem 1B, and it is why
+the ceiling was stated in advance rather than a weak classifier presented as a
+disappointment.
+
+\paragraph{The benefit of outreach is assumed, not measured.}
+Section~\ref{sec:cost} values a contact at the review it prevents, and the data
+contain no contacts: nobody in this history was reached before reviewing, so the
+effect of reaching them --- and the possibility that an unsolicited contact
+lowers a rating --- is unobserved. The precision and recall figures stand on
+their own; the reais figures do not, and should be read as the value of the
+policy \emph{if} the pilot of Section~\ref{sec:pilot} finds the contact averts at
+least one low review in five. Until it runs, the recommendation is to pilot at
+ten contacts a day for six weeks, not to scale.
+
+\paragraph{What the data does not contain, and what rests on assumption.}
+The target of Problem 2 is a platform rating, with the self-selection
+Section~\ref{sec:problem} describes: a model of the rating is not a model of
+satisfaction, and the 1--2 star label cannot see the quietly dissatisfied
+customer who never reviews. The service-quality literature identifies product
+expectation gaps, seller communication and returns handling among the drivers of
+dissatisfaction \citep{parasuraman2005esqual, rao2011elsq}; none appears in these
+nine tables, so the Problem 2 residual is unobserved cause rather than noise, and
+the free-text review columns are too sparse to recover it. Olist publishes no
+cost figures, so Section~\ref{sec:cost} reports break-even precision, the
+quantity that decides the recommendation and moves with the assumption.
+Selection votes on three out-of-sample windows --- the right trade under drift,
+but a small sample: Section~\ref{sec:results-late} records a case where the
+rule preferred a model that does not transfer, and
+Section~\ref{sec:results-review} shows a fold-to-fold spread too wide to
+separate the best candidates at all.
+
+\paragraph{Generalisation, and what these scores are not.}
+Everything here is Brazil, 2017--2018, on one marketplace whose geography ---
+59.7\% of sellers in S\~{a}o Paulo state against 42.0\% of customers, a median
+order travelling 434\,km --- the models' distance-driven structure reflects.
+The outputs are triage scores for internal prioritisation, not
+entitlements, and must not be used to penalise a seller, price a customer, or
+drive an automated decision about someone without review; the review-risk model
+is largely a restatement of lateness, so a seller penalised by it would often
+be penalised for a carrier's failure.
+
+\subsection*{Conclusion}
+
+Two problems, at two prediction moments, from one dataset and one feature
+pipeline, carried through to a deployed application. The regression reaches
+MAE 3.90 days --- 41\% below a constant fitted on the past and 60\% below the
+platform's own promise --- and its output, thresholded against that promise,
+makes a better late-order flag (2.89$\times$ the no-skill floor) than any
+classifier trained directly on the binary label (1.24$\times$), so the brief's
+dual framing turns out to be the substantively better design. The satisfaction
+model reaches 3.75$\times$ its floor on a target where always predicting
+``satisfied'' scores 89\% accuracy and catches nothing, and read as a ranked
+list it turns ten contacts a day into an outreach queue of 57\% precision ---
+a value limited by capacity, not by the model's threshold.
+
+The methodological findings travel further. Cross-validation inside a drifting
+training period reorders the candidates relative to the forward window, and its
+fold-to-fold spread is too wide to tell the best candidates apart --- so
+selection belongs on several recent out-of-sample windows judged by rank, and
+even then it can fail. Weighting the loss for class imbalance leaves ranking
+unchanged and inflates predicted risk threefold, so the threshold is the right
+lever. Raw PR-AUC is not comparable across periods with different base rates
+while its lift over the floor is. And the most useful business results are
+negative: an informative flag that does not justify an expensive intervention,
+and a paper gain of R\$1{,}466 per thousand orders that is worth a six-week
+experiment before it is worth anything.

@@ -1,0 +1,105 @@
+\section{Modelling Methodology}
+\label{sec:method}
+
+\subsection{Model family budget and pipelines}
+\label{sec:families}
+
+The brief allows two to three families and asks for depth rather than breadth.
+We use three, reused across both task types, each arranged as a
+\emph{complexity ladder} whose rung 0 is the family's simplest variant --- the
+only way ``the added complexity was worth it'' becomes a finding rather than an
+assumption. \textbf{A --- Linear} runs \code{LinearRegression} /
+\code{LogisticRegression} at rung 0 and \code{Ridge} / $\ell_2$-penalised
+logistic at rung 1. \textbf{B --- Tree-based} runs \code{DecisionTree} $\to$
+\code{RandomForest} $\to$ \code{HistGradientBoosting}, the three steps
+Section~\ref{sec:lit} argued from the literature. \textbf{C --- Ensemble} is
+soft \code{Voting} and \code{Stacking} assembled from the winners of A and B;
+its members are complete pipelines rather than bare estimators, because the two
+families need different encodings and one shared preprocessor would force a
+single choice on both. The full specification, the search spaces and the
+selected values of every tuned model are in Appendix~\ref{app:hyperparameters}.
+
+Every model is a \code{scikit-learn} \code{Pipeline}: median imputation, one-hot
+encoding of the four categoricals with rare levels folded into one bucket, then
+--- for the linear family only --- standardisation, since trees are invariant to
+monotone rescaling and a shared penalty is not \citep{pedregosa2011sklearn}. The
+linear family additionally drops one level per categorical, a correction rather
+than a preference: Phase 1 reported that ordinary least squares was unusable
+here, ``rank-deficient, so its coefficients explode'', and re-running it four
+ways (Appendix~\ref{app:encoding}) shows the predictions were always fine and
+only the coefficient vector was not; with full rank restored, Ridge and OLS
+agree to three decimals. Regularisation buys numerical stability here, not
+accuracy.
+
+\subsection{Cross-validation, and how a model gets chosen}
+\label{sec:cv}
+
+Delivery performance drifts hard --- mean lead time falls \textbf{5.34 days}
+between training and test --- so shuffled $k$-fold lets a model learn from the
+future, the invalidity \citet{bergmeir2012cv} formalise. Hyperparameters are
+tuned by \code{TimeSeriesSplit} with five expanding windows inside the training
+period, searched with \code{RandomizedSearchCV} \citep{bergstra2012random} over
+30 draws per model (six for the costly random forests), scoring
+\code{neg\_mean\_absolute\_error} for regression and \code{average\_precision}
+for classification.
+
+\emph{Selecting} between tuned models is a separate question, and both obvious
+answers fail here for reasons that are properties of the data. Averaging
+cross-validated scores fails because the folds differ enormously in difficulty
+--- lead time runs 12--17 days across the 2017 folds against 8.3 in the test
+window --- so every model's CV error sits about a day above its forward error and
+the \emph{ordering} does not survive: cross-validated MAE ranks Ridge above the
+boosted trees, while every later window and the test period rank them the other
+way round (Figure~\ref{fig:ladder}b). Using the validation period alone fails
+too: two months is short, and these two pull in opposite directions, the late
+rate being 8.2\% in May 2018 and \textbf{1.4\%} in June, the lowest in the
+series.
+
+Each candidate is therefore scored on all six out-of-sample windows --- the five
+expanding folds and the validation period --- \textbf{ranked within each}, and
+the winner is the best mean rank over the \textbf{three most recent}. Ranks
+rather than scores, because ranks are the only thing comparable across windows
+of different difficulty and different base rates; three windows because that
+covers roughly February to June 2018, recent enough to resemble deployment and
+wide enough that neither of the validation period's two odd months decides
+alone. All six windows are reported for every candidate, with their
+fold-to-fold spread, in Appendix~\ref{app:protocol}; a shuffled,
+customer-disjoint \code{StratifiedGroupKFold} is computed alongside as a
+contrast exhibit and never used to choose anything. The selected models are
+\emph{not} refitted on train plus validation before the test window is scored:
+that would decouple the shipped artifact from the threshold and calibration
+fitted against it, and what is reported here is exactly what is deployed.
+
+\subsection{Imbalance, metrics aligned to the action, and reproducibility}
+\label{sec:imbalance}
+
+Both targets are imbalanced --- 7.4\% late and 11.0\% low review in the test
+period --- so accuracy alone is meaningless and every results row carries
+\code{majority\_accuracy} beside \code{accuracy}, with PR-AUC reported against
+its no-skill floor \citep{saito2015prplot}. Following
+\citet{goorbergh2022imbalance} we fit on the observed prior and move the
+\emph{decision threshold} instead, tuned on the validation period by maximising
+F1, and Section~\ref{sec:results-review} tests the alternative rather than
+assuming the result; no resampling is used anywhere \citep{chawla2002smote}.
+Calibrated probabilities are a requirement rather than a nicety, because
+Section~\ref{sec:cost} multiplies them by a cost \citep{elkan2001cost}; they are
+reported, not assumed \citep{niculescu2005calibration}.
+
+A second alignment follows from Table~\ref{tab:levers}. PR-AUC summarises the
+whole ranking and is the right criterion for \emph{choosing} between models,
+but neither team acts on the whole ranking: customer experience contacts the
+$K$ riskiest deliveries its agents can reach in a day, and operations reviews
+the top of the late list. Section~\ref{sec:results-capacity} therefore reports
+Precision@$K$ and Recall@$K$ for both flags \citep{provost2013data,
+verbeke2012churn}, with $K$ as a share of the day's volume so that the same
+table holds on a quiet Tuesday and on Black Friday, and Section~\ref{sec:cost}
+chooses the operating point as a capacity rather than as a threshold.
+
+\code{SEED = 42} throughout. \code{src/train\_models.py} fits everything and
+writes the models, metadata and every result table; \code{src/phase3\_stats.py}
+distils those into \code{report/stats\_phase3.txt}, and no number enters this
+report that it cannot regenerate; every figure is drawn from the same tables.
+Artifacts record the \code{scikit-learn} version that wrote them and the loader
+checks it; \code{tests/test\_leakage.py} runs \textbf{\checkcount{}} validation
+checks, including one that ties the deployed artifacts to the metadata and to
+this text (Appendix~\ref{app:repro}).

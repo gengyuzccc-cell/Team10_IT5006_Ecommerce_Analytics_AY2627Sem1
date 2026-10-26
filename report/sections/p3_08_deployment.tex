@@ -1,0 +1,91 @@
+\section{Model Deployment and Application}
+\label{sec:deployment}
+
+The proof of concept is a Streamlit application deployed on Streamlit
+Community Cloud at \url{https://team10-it5006-olist.streamlit.app}, built from
+the \code{deployment/} folder of the repository. It serves all three deployed
+models, and because the Olist extract ends in 2018 it does what the brief
+anticipates: it predicts on held-out historical records that stand in for new
+orders, and it can replay the test window a day at a time.
+
+\subsection{Architecture}
+
+\begin{table}[htbp]
+\centering
+\caption{The deployed artifacts, as pickled. Thresholds and the margin-to-risk
+mapping were fitted on the validation period; nothing was refitted for
+deployment, so the served models are exactly the ones Section~\ref{sec:results}
+evaluates.}
+\label{tab:deployed}
+\footnotesize
+\begin{tabular}{@{}p{2.3cm}p{5.6cm}p{2.0cm}p{4.3cm}@{}}
+\toprule
+\textbf{Problem} & \textbf{Estimator served} & \textbf{Artifact} & \textbf{Decision rule} \\
+\midrule
+1A lead time & \code{VotingRegressor}: LinearRegression + HistGradientBoosting, weights 1:2 & 381\,KB & re-quote with the estimate \\[2pt]
+1B late flag & logistic map of (predicted $-$ promised days) to a probability & 1\,KB & flag at $p_{\text{late}} \ge 0.11$ \\[2pt]
+2 low review & \code{StackingClassifier}: $\ell_2$ LogisticRegression + HistGradientBoosting, logistic meta-learner & 321\,KB & flag at $p_{\text{low}} \ge 0.19$; rank for the top-$K$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Nothing in the application reimplements the training-time feature engineering.
+A form submission or an uploaded row is turned back into an order frame and
+pushed through the same \code{src/features.py} builders the models were fitted
+on, which is what stops a feature being computed one way in training and
+another way in production \citep{sculley2015debt}. The one thing a form cannot
+supply is a seller's track record, so \code{models/history\_lookup.csv} carries
+those aggregates at each level of the same fallback chain the training code
+uses. The artifacts total under 1\,MB and record the \code{scikit-learn}
+version that wrote them; \code{requirements.txt} pins that version, the loader
+raises a visible warning if it ever drifts, and the app runs on Python 3.12,
+the interpreter the pinned numpy publishes wheels for. Models are loaded
+lazily, so a visitor who only browses the exploratory tabs never pays for
+unpickling one.
+
+\subsection{What the application does}
+
+The application has eight tabs (Figures~\ref{fig:app-predict} to
+\ref{fig:app-card}). Five are the exploratory analysis of Section~\ref{sec:eda}
+with sidebar filters. \textbf{Predict} scores a single order entered as it
+would look at checkout and returns the expected lead time with its typical
+error, the risk of missing the promised date against the tuned threshold, and,
+conditional on that forecast, the low-review risk; it also scores an uploaded
+CSV of up to 5{,}000 orders and builds the \textbf{triage list}: rows ranked by
+review risk with the top-$K$ marked for a capacity the user enters, and the
+precision and recall that capacity achieved on the held-out window beside it.
+\textbf{Replay a day} is new in this phase (Figure~\ref{fig:app-replay}): the
+user picks any purchase day in the test window and a daily capacity, sees what
+the deployed models predicted for every order placed that day, ranked the way
+the customer-experience team would work them, and a toggle reveals what
+actually happened --- which orders left a 1--2 star review, how long delivery
+really took --- with the precision of the top-$K$ on that day and on every
+other day of the window. For 16 July 2018 at ten contacts, eight of the ten
+would have reached a would-be low reviewer. \textbf{Model card} states what is
+deployed as read from the artifacts (Table~\ref{tab:deployed}), the training
+protocol, every searched model's selected hyperparameters, the fold-to-fold
+variation of every candidate, the Precision@$K$ table, the situations in which
+the models should not be trusted \citep{mitchell2019modelcards}, and a
+calculator for the pilot of Section~\ref{sec:pilot}. Every number it shows is
+read from the result tables this report quotes; the application recomputes
+nothing.
+
+\subsection{Robustness, reachability and reproducibility}
+
+Invalid input produces a specific message rather than a traceback: a promised
+date before the purchase date, a non-positive price, more sellers than items, a
+malformed, empty or oversized upload, a missing column, an unknown category or
+state, a missing artifact, a version mismatch. The data loader asserts the row
+count of all nine source tables and stops the app if they change. There are no
+API endpoints and no credentials anywhere: the batch CSV contract, documented
+with an example in \code{deployment/README.md}, is the programmatic surface.
+
+The Phase 1 dashboard became inaccessible when the GitHub account it was
+deployed from was suspended, which took the Community Cloud app down with it.
+The application now deploys from the team's current repository, and two things
+keep it reachable, both recorded in the README: Community Cloud puts an app
+without visitors for twelve hours to sleep behind a one-click wake-up button
+that any visitor can press, and the Python version must stay at 3.12 in the
+app's settings. A fresh clone reproduces everything, from the committed source
+tables to every table, figure and number in this document
+(Appendix~\ref{app:repro}).

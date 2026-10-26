@@ -1,0 +1,60 @@
+\section*{Executive Summary}
+\addcontentsline{toc}{section}{Executive Summary}
+\label{sec:executive}
+
+Olist is a Brazilian marketplace that places small sellers on large retail
+platforms and manages fulfilment for them; its public dataset --- 99{,}441
+orders in nine relational tables, 2016--2018 --- records each order from
+checkout to delivery to review. This project asks two questions of it, at two
+moments in an order's life, and turns the answers into decisions.
+\textbf{Problem 1, at checkout:} how long will this order take, and will it miss
+the date the customer was promised? \textbf{Problem 2, at delivery:} will this
+parcel draw a one- or two-star review? The first serves the operations team,
+which can re-quote a promise, warn a buyer or expedite a parcel; the second
+serves customer experience, which can reach a customer before the review is
+written. The two are halves of one chain: a late delivery raises the
+probability of a low review from 9.2\% to 54.0\%, the strongest relationship in
+the data.
+
+Three disciplines run through the work. \emph{Leakage is defined per prediction
+moment}, and a guard enforces the right feature set before any model is fitted
+--- one forbidden column lifts the late flag's ROC-AUC from 0.589 to 1.000.
+\emph{Time is respected}: the split is chronological and customer-disjoint,
+cross-validation uses expanding windows, and the test window (July--August
+2018) was scored once, for models already chosen. \emph{Complexity has to earn
+its place}: three model families --- linear, tree-based, ensemble --- are run
+as ladders from their simplest variant up, and every rung is compared with the
+one below it.
+
+The lead-time regression reaches a mean absolute error of \textbf{3.90 days},
+41\% below a constant fitted on the past and 60\% below the platform's own
+promised date. Thresholding that forecast against the promise gives a late-order
+flag at 2.9 times the no-skill floor, where the best classifier trained on the
+binary label reaches 1.2 times. The low-review model reaches ROC-AUC 0.749 and
+PR-AUC 0.414, \textbf{3.75 times its floor}, on a target where always predicting
+``satisfied'' scores 89\% accuracy and catches nothing. Read as a ranked list,
+which is how a team with limited capacity uses it, contacting the riskiest 5\%
+of deliveries reaches a would-be low reviewer two times in three.
+
+Three recommendations follow, each with a stated cost. Operations should
+re-quote every promise with the model's estimate and pre-warn buyers whose late
+risk exceeds 11\%, both nearly free; it should \emph{not} expedite on the flag,
+whose precision never clears the 0.30 a R\$12 intervention would need. Customer
+experience should work each day's deliveries from the top of the review-risk
+list to its capacity: at illustrative costs of R\$5 per contact and R\$40 per
+low review the policy is worth about R\$1{,}466 per thousand delivered orders.
+Because that figure assumes a contact prevents the review it reaches ---
+something no historical data can show --- the report sizes the pilot that would
+test it: a randomised hold-out inside the daily list, about six weeks at ten
+contacts a day, with break-even at roughly one averted review in five.
+
+Everything is deployed and reproducible. A Streamlit application at
+\url{https://team10-it5006-olist.streamlit.app} serves the three models on
+single orders and batch files, returns the ranked triage list, replays any day
+of the held-out test window with the real outcomes revealable, and carries a
+model card stating exactly which estimators are deployed. The repository holds
+the source tables, ten executed notebooks, the fitted artifacts and the scripts
+that regenerate every number in this document; a suite of \checkcount{}
+validation checks ties the metadata, the pickled models, the result tables and
+this text to one another. Both rounds of evaluator feedback are incorporated
+throughout and answered point by point in Appendix~\ref{app:feedback}.

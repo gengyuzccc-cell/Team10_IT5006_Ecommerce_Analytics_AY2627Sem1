@@ -1,0 +1,292 @@
+\section{Results and Evaluation}
+\label{sec:results}
+
+Everything below is the untouched test window, 2018-07-01 to 2018-08-31, scored
+once for models already chosen. Cross-validated and validation columns sit beside
+it because the disagreement between them is part of the result;
+Appendix~\ref{app:tvt} adds the in-sample training fit of the deployed models,
+and Section~\ref{sec:results-segments} carries the error analysis by month and
+region. Figures are in Appendix~\ref{app:figures}.
+
+\subsection{Problem 1A --- lead time}
+\label{sec:results-reg}
+
+\begin{table}[htbp]
+\centering
+\caption{Lead-time regression: two reference points that are not models, then
+each family's complexity ladder. CV MAE is the mean over the five expanding
+folds with its fold-to-fold standard deviation. \best{Bold} is the selected
+and deployed model. Figure~\ref{fig:ladder}.}
+\label{tab:reg}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+\textbf{Model} & \textbf{Family} & \textbf{CV MAE $\pm$ sd} & \textbf{Val MAE} &
+\textbf{Test MAE} & \textbf{RMSE} & \textbf{$R^2$} \\
+\midrule
+Mean of the training period      & baseline & ---  & ---  & 6.645 & 7.572 & $-0.990$ \\
+Olist's own delivery promise     & baseline & ---  & ---  & 9.788 & 12.155 & $-4.130$ \\
+\midrule
+LinearRegression \emph{(rung 0)} & A linear & 5.242 $\pm$ 1.00 & 4.965 & 4.181 & 5.639 & $-0.104$ \\
+Ridge \emph{(rung 1)}            & A linear & 5.201 $\pm$ 0.95 & 5.164 & 4.309 & 5.775 & $-0.158$ \\
+DecisionTree \emph{(rung 0)}     & B tree   & 5.539 $\pm$ 0.91 & 5.927 & 6.116 & 8.664 & $-1.606$ \\
+RandomForest \emph{(rung 1)}     & B tree   & 5.457 $\pm$ 0.90 & 5.513 & 4.956 & 6.169 & $-0.321$ \\
+HistGradientBoosting \emph{(rung 2)} & B tree & 5.495 $\pm$ 0.81 & 4.802 & 4.141 & 5.517 & $-0.057$ \\
+\best{VotingRegressor (A+B)}     & C ensemble & 5.315 $\pm$ 0.87 & \best{4.784} & \best{3.898} & \best{5.342} & \best{$+0.009$} \\
+StackingRegressor (A+B)          & C ensemble & 5.443 $\pm$ 0.84 & 4.792 & 4.121 & 5.430 & $-0.024$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+The selected model puts mean absolute error at \textbf{3.90 days}: \textbf{41.3\%
+below} a constant fitted on the training period and \textbf{60.2\% below the
+platform's own promised date}. That second comparison is the one operations cares
+about, and its direction is not anomalous --- a promised date is a commercial
+decision, padded because a broken promise costs returns and retention
+\citep{cui2024promise}. It is an excellent feature and a poor forecast.
+
+Three things matter more than the winner. \textbf{Regularisation does not pay:}
+Ridge is \emph{worse} than plain least squares on validation (5.164 against
+4.965) and on test (4.309 against 4.181), with a tuned $\alpha$ of 660 that
+cross-validation preferred and no later window did --- within family A, rung 1
+fails to beat rung 0. \textbf{Inside family B complexity does pay},
+monotonically on validation: 5.927 $\rightarrow$ 5.513 $\rightarrow$ 4.802. And
+\textbf{only the ensemble has a positive $R^2$}; every other model is negative,
+the signature of a level shift rather than of a useless model, and the reason
+MAE leads throughout \citep{hyndman2006accuracy}. The blend beats both its
+members (4.181 and 4.141 against 3.898) by a specific mechanism: a tree cannot
+predict outside the range of the targets it was fitted on, and test-window lead
+times are systematically shorter than anything common in training, whereas a
+linear model extrapolates the level (Figure~\ref{fig:extrap}). Averaging is one
+member covering the other's exact failure, which is why the weights are fixed
+at 1:2 in the tree's favour rather than tuned.
+
+\subsection{Problem 1B --- late against the promise}
+\label{sec:results-late}
+
+\begin{table}[htbp]
+\centering
+\caption{The late-order flag, best of each route; the full seven-candidate table
+is in \code{report/results/clf\_p1b.csv}. No-skill PR-AUC floor 0.074.
+Figure~\ref{fig:routes}.}
+\label{tab:late}
+\footnotesize
+{\setlength{\tabcolsep}{3pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}llrrrrrrr@{}}
+\toprule
+\textbf{Route} & \textbf{Model} & \textbf{ROC-AUC} & \textbf{PR-AUC} &
+\textbf{lift} & \textbf{bal.\ acc} & \textbf{prec.} & \textbf{recall} & \textbf{F1} \\
+\midrule
+direct  & best of five (HistGB) & 0.584 & 0.092 & 1.24$\times$ & 0.524 & 0.088 & 0.279 & 0.134 \\
+derived & predicted $>$ promised, unfitted & 0.569 & 0.109 & 1.47$\times$ & 0.569 & 0.274 & 0.175 & 0.214 \\
+\best{derived} & \best{regression margin, calibrated} & \best{0.782} & \best{0.214} & \best{2.89$\times$} & \best{0.705} & 0.137 & \best{0.826} & \best{0.235} \\
+\bottomrule
+\end{tabular}}}
+\end{table}
+
+The deliverable is the derived route, and that follows from the framing fixed in
+Section~\ref{sec:problem} rather than from the numbers: Problem 1 is the brief's
+dual framing, so the flag \emph{is} the regression's own answer compared against
+the promised date. The five direct classifiers answer a different question ---
+does the flag need a model of its own? It does not. The derived route reaches
+\textbf{2.89$\times$} the no-skill floor where the best direct classifier reaches
+1.24$\times$, and it costs no additional model: the margin
+$\hat{y} - \text{promised}$ is mapped to a probability by a single-parameter
+logistic \citep{platt1999probabilistic} fitted on validation. Even the
+zero-parameter rule --- flag whenever the model expects a miss --- beats every
+fitted classifier.
+
+\paragraph{The selection protocol got this one wrong, and that is worth reporting.}
+Applied to these seven candidates the rolling-origin rule of Section~\ref{sec:cv}
+ranks a direct classifier first. On every in-training window the candidates sit
+within noise of one another --- in the fifth fold they span 0.206 to 0.362, with
+the derived route mid-pack --- so the rule separates them on noise; on the
+forward window the gap opens to a factor of 2.3. The later training folds and
+the validation period are dominated by the February--March 2018 carrier
+slowdown and by the week the strike caught in transit
+(Section~\ref{sec:eda-lateness}); a classifier can fit a regime, whereas the
+derived route encodes a mechanism, and mechanisms transfer. We report the
+disagreement rather than presenting the rule as having chosen this, and note
+that confirming the preference would need a further forward window we do not
+have.
+
+\subsection{Problem 2 --- low-review risk}
+\label{sec:results-review}
+
+\begin{table}[htbp]
+\centering
+\caption{Low-review classification at delivery. CV is the mean PR-AUC over the
+five expanding folds with its fold-to-fold standard deviation
+(Figure~\ref{fig:cvfolds}; every fold in Table~\ref{tab:cvfolds}). Accuracy is
+printed beside the majority-class rule that scores 0.890 while catching nothing.
+No-skill PR-AUC floor 0.110. \best{Bold} is the selected and deployed model.
+Figure~\ref{fig:lowreview}.}
+\label{tab:review}
+\footnotesize
+{\setlength{\tabcolsep}{2.2pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}llrrrrrrrrrr@{}}
+\toprule
+\textbf{Model} & \textbf{Fam.} & \textbf{CV $\pm$ sd} & \textbf{Val} & \textbf{ROC} &
+\textbf{PR-AUC} & \textbf{lift} & \textbf{bal.\ acc} & \textbf{prec.} &
+\textbf{recall} & \textbf{F1} & \textbf{Brier} \\
+\midrule
+LogisticRegression \emph{(r0)}   & A & 0.465 $\pm$ .095 & 0.320 & 0.659 & 0.291 & 2.63$\times$ & 0.636 & 0.328 & 0.365 & 0.345 & 0.090 \\
+LogisticRegression ($\ell_2$) \emph{(r1)} & A & 0.466 $\pm$ .095 & 0.320 & 0.659 & 0.291 & 2.63$\times$ & 0.636 & 0.317 & 0.371 & 0.342 & 0.090 \\
+DecisionTree \emph{(r0)}         & B & 0.543 $\pm$ .092 & 0.389 & 0.722 & 0.396 & 3.59$\times$ & 0.677 & 0.562 & 0.391 & 0.461 & 0.080 \\
+RandomForest \emph{(r1)}         & B & 0.568 $\pm$ .089 & 0.403 & 0.744 & 0.405 & 3.67$\times$ & 0.680 & 0.576 & 0.396 & 0.470 & 0.078 \\
+HistGradientBoosting \emph{(r2)} & B & 0.568 $\pm$ .088 & 0.407 & 0.749 & 0.415 & 3.76$\times$ & 0.680 & 0.579 & 0.396 & 0.471 & 0.078 \\
+VotingClassifier (A+B)           & C & 0.561 $\pm$ .084 & 0.404 & 0.747 & 0.407 & 3.69$\times$ & 0.683 & 0.477 & 0.422 & 0.448 & 0.079 \\
+\best{StackingClassifier (A+B)}  & C & 0.568 $\pm$ .087 & \best{0.409} & 0.749 & 0.414 & 3.75$\times$ & 0.681 & 0.575 & 0.398 & 0.470 & 0.078 \\
+\bottomrule
+\end{tabular}}}
+\end{table}
+
+The selected model reaches \textbf{ROC-AUC 0.749}, \textbf{balanced accuracy
+0.681} and \textbf{PR-AUC 0.414 --- 3.75$\times$ the no-skill floor}. Its raw
+accuracy is 0.901 against a majority-class rule scoring 0.890, which is exactly
+why accuracy is printed but never led with. The tree family beats the linear one
+by 1.43$\times$ on PR-AUC --- but a \emph{single depth-limited decision tree}
+already reaches 0.396 of the eventual 0.414, so 96\% of the achievable signal
+comes from one interpretable tree. And the model does not memorise buyers: on the
+12{,}617 test orders from customers never seen in training it scores PR-AUC
+\textbf{0.415} against 0.414 overall.
+
+\paragraph{What the fold-to-fold variation says.}
+The Phase 2 evaluation asked for the spread behind each cross-validated number;
+Figure~\ref{fig:cvfolds} draws every candidate on every window and
+Table~\ref{tab:cvfolds} lists them. The spread is large --- a standard
+deviation of about 0.09 around every mean --- and almost entirely a property of
+the \emph{windows}: the mean over candidates runs from 0.376 on the first fold
+to 0.630 on the fourth, while within any one window the candidates spread by a
+median of 0.045. The three tree-based rungs are inseparable on this evidence
+(CV means of 0.568 apiece; the gap between the best two is under 0.0001), which
+is the empirical case for the rank-based rule of Section~\ref{sec:cv} and for
+reading the forward columns when the difference is this small. The linear
+family is separated from the trees on every single window, so that conclusion
+is robust to the spread.
+
+\paragraph{Class weighting: the ablation Phase 1 promised.}
+On the best tree model, weighting the loss moves ROC-AUC from 0.749 to 0.747 and
+PR-AUC from 0.415 to 0.411 --- no gain --- while the Brier score degrades from
+\textbf{0.0778 to 0.1331}, a 71\% deterioration, and mean predicted risk inflates
+from 0.119 to \textbf{0.337} against an actual rate of 0.110. The weighted model
+overstates every customer's risk threefold (Figure~\ref{fig:calibration}). We
+therefore fit on the observed prior and move the threshold instead: tuned on
+validation by maximising F1 it lands at 0.19 rather than 0.50, which on the test
+window raises F1 from 0.414 to \textbf{0.470} and recall from 0.297 to 0.398 at
+a precision cost of 0.686 to 0.575. Calibration holds where the volume is: in
+the two bins containing 11{,}892 of the 12{,}855 test orders the gap between
+predicted risk and observed rate is under 0.013.
+
+\subsection{Capacity-constrained evaluation: Precision@$K$ and Recall@$K$}
+\label{sec:results-capacity}
+
+\begin{table}[htbp]
+\centering
+\caption{What a ranked list delivers at a fixed capacity, on the test window.
+$K$ is the share of orders acted on; the daily rows cut the list per purchase
+day, which is how a team actually works it. Break-even precision is
+$c_{\text{action}}/c_{\text{miss}}$ from Section~\ref{sec:cost}.
+Figure~\ref{fig:capacity}.}
+\label{tab:capacity}
+\footnotesize
+{\setlength{\tabcolsep}{2.6pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+ & \multicolumn{3}{c}{\textbf{Review risk, at delivery}} & \multicolumn{3}{c}{\textbf{Late flag, at checkout: derived / direct}} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+\textbf{Capacity $K$} & \textbf{precision} & \textbf{recall} & \textbf{lift} & \textbf{precision} & \textbf{recall} & \textbf{lift} \\
+\midrule
+top 1\%  & 0.705 & 0.064 & 6.4$\times$ & 0.270 / 0.111 & 0.036 / 0.015 & 3.6 / 1.5$\times$ \\
+top 2\%  & 0.700 & 0.127 & 6.3$\times$ & 0.273 / 0.126 & 0.074 / 0.034 & 3.7 / 1.7$\times$ \\
+top 5\%  & 0.678 & 0.307 & 6.1$\times$ & 0.274 / 0.104 & 0.185 / 0.071 & 3.7 / 1.4$\times$ \\
+top 10\% & 0.475 & 0.431 & 4.3$\times$ & 0.258 / 0.093 & 0.348 / 0.126 & 3.5 / 1.3$\times$ \\
+top 15\% & 0.369 & 0.502 & 3.3$\times$ & 0.234 / 0.089 & 0.473 / 0.181 & 3.2 / 1.2$\times$ \\
+top 20\% & 0.300 & 0.544 & 2.7$\times$ & 0.211 / 0.089 & 0.568 / 0.241 & 2.8 / 1.2$\times$ \\
+top 30\% & 0.236 & 0.641 & 2.1$\times$ & 0.175 / 0.086 & 0.707 / 0.349 & 2.4 / 1.2$\times$ \\
+\midrule
+10 a day (4.8\%) & 0.572 & 0.248 & 5.2$\times$ & --- & --- & --- \\
+20 a day (9.5\%) & 0.440 & 0.378 & 4.0$\times$ & --- & --- & --- \\
+\midrule
+break-even precision & \multicolumn{3}{c}{0.125 \ (R\$5 : R\$40)} & \multicolumn{3}{c}{0.300 \ (R\$12 : R\$40)} \\
+\bottomrule
+\end{tabular}}}
+\end{table}
+
+Table~\ref{tab:capacity} reads the same test predictions as
+Tables~\ref{tab:late} and \ref{tab:review}, but as a team with limited capacity
+would. Three things follow. \textbf{Capacity, not the threshold, is the binding
+constraint for the review flag.} At a capacity of 5\% of deliveries --- about ten
+contacts a day on this volume of 207 delivered orders a day --- two contacts in
+three reach a customer who would in fact have left a 1--2 star review, 6.1
+times the rate of contacting at random, and those contacts cover 30.7\% of all
+such reviews. Precision stays above the 0.125 break-even at every capacity
+tried, so the policy is not a threshold but an instruction: work the day's list
+from the top until the agents run out. The F1-tuned threshold corresponds to a
+capacity of 7.6\% and the cost-optimal one to 15.0\%
+(Figure~\ref{fig:capacity}a), points on this curve rather than decisions of
+their own. The daily rows cut the list per day, as a team must; at ten contacts
+a day precision is 0.572 and recall 0.248, a little below the pooled 5\% row
+because days differ in how many risky orders they hold. \textbf{The derived late
+flag dominates the direct classifier at every capacity}, by a factor of two to
+nearly three on precision. \textbf{And it never clears the break-even for an
+expensive action}: its precision peaks at 0.274 and falls as $K$ grows, under
+the 0.300 a R\$12 expedite would need, so Table~\ref{tab:levers} confines
+expediting to a manual review of the very top of the list.
+
+\subsection{Does the third family earn its place, and what is deployed}
+\label{sec:results-ensemble}
+
+Family C is selected on both problems and the honest answer differs. On
+\textbf{lead time} it earns its place: the Voting blend improves on the better of
+its members by 0.24 days of MAE (5.9\%) and is the only model in
+Table~\ref{tab:reg} with a positive $R^2$, for the extrapolation reason above. On
+\textbf{review risk} it does not: Stacking wins the rank vote by a nose (mean
+rank 1.67 against 2.00, ahead on three of the six windows), then matches the
+boosted trees to three decimals on ROC-AUC and comes in 0.001 \emph{below} them
+on PR-AUC --- and the ensemble was \emph{flattered}, because stacking's inner
+folds must partition the training set and so cannot be an expanding window
+(Appendix~\ref{app:hyperparameters}). Being flattered and still failing to
+separate is a safer conclusion than the reverse.
+
+\textbf{What is deployed.} The Phase 2 report named the deployed review model
+inconsistently; the artifacts settle it. The served models are the selection
+rule's winners, read back from the pickles: the \textbf{VotingRegressor} (linear
++ histogram-boosted, weights 1:2) for lead time, the derived route with its
+one-parameter calibration for the late flag, and the \textbf{StackingClassifier}
+--- the tuned $\ell_2$ logistic regression and the tuned
+\code{HistGradientBoosting} classifier under a logistic meta-learner that
+weights the tree member 13.8 times the linear one --- for review risk
+(Table~\ref{tab:deployed}). The single boosted model would lose nothing
+measurable; it is not what is deployed, because the selection rule was fixed
+before any test score was seen and switching afterwards would be the
+selection-on-test practice this report rules out. The practical cost is nil ---
+the stacked artifact is 321\,KB --- and the validation suite asserts that the
+artifact, the metadata, the hyperparameter table and this text name the same
+estimator.
+
+\subsection{Error analysis: where the models fail}
+\label{sec:results-segments}
+
+Across geography the review model is remarkably stable: ROC-AUC runs 0.744 to
+0.778 across the five Brazilian regions, with lift over each region's own floor
+between 3.6$\times$ and 5.0$\times$ (Figure~\ref{fig:segments}b). The
+regression is not: MAE runs from 3.42 days in the Southeast, where most orders
+are, to \textbf{6.84 days in the North}, and the bias is positive everywhere ---
+$+1.15$ days in the Southeast rising to $+4.77$ in the North
+(Figure~\ref{fig:segments}a), and the bias stays positive in both test months
+(Figure~\ref{fig:resid}). The model \emph{over-predicts lead time everywhere},
+most severely where deliveries are longest, which is what a model fitted on a
+slower past does when fulfilment has improved underneath it, and the strongest
+argument for refitting on a rolling basis. Table~\ref{tab:tvt} in
+Appendix~\ref{app:tvt} separates that drift from over-fitting: the blend's
+in-sample MAE (4.72) sits level with
+validation (4.78) and above test (3.90), and the stacked review model shows the
+modest in-sample optimism of a tree ensemble (ROC-AUC 0.836 in-sample against
+0.762 and 0.749 on the periods it never saw) while validation and test agree
+with each other.

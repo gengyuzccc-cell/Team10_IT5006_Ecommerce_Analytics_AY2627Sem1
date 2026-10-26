@@ -1,0 +1,86 @@
+\section{Dataset and Preprocessing}
+\label{sec:data}
+
+\subsection{Nine tables, one row per order}
+
+The dataset \citep{olist2018dataset} comprises nine related CSV tables, roughly
+1.45 million rows; \code{orders} is the spine, at 99{,}441 rows, one per order,
+and the other eight attach to it directly or through \code{order\_items}
+(Figure~\ref{fig:datamodel}; Table~\ref{tab:dictionary} in
+Appendix~\ref{app:dictionary} is the full data dictionary). Three tables are
+\textbf{one-to-many} against orders, and joining them naively is the first trap
+the data sets: a direct orders--items--payments merge yields 118{,}437 rows
+rather than 99{,}441, a 19\% inflation that silently reweights every mean
+towards large baskets. Each child table is therefore aggregated to one row per
+order --- counts, sums and the attributes of the most expensive item --- and
+the grain is asserted after the join.
+
+The second trap is identity. \code{customer\_id} is regenerated for every
+order, so it is an order key, not a person: 99{,}441 distinct values map to only
+\textbf{96{,}096} \code{customer\_unique\_id} values. Grouping on the wrong one
+reports zero repeat buyers; the right one finds 2{,}997 people (3.1\%) who
+ordered again. \code{customer\_unique\_id} is carried throughout and the split
+is made on it.
+
+Missingness is \textbf{structural rather than random}: 97.0\% of orders reach
+status \emph{delivered}, and the 2.98\% with no delivery timestamp are orders
+whose delivery has not happened, so their delivery targets are undefined and
+excluded rather than imputed. Elsewhere the data is remarkably complete: 99.2\%
+of orders carry a review and product attributes are missing for under 2\% of
+products. The remaining issues --- reused \code{review\_id} values and orders
+with several reviews (keyed on \code{order\_id}, earliest kept), free-text
+review fields too sparse for text features, a million geolocation rows
+collapsed to a median coordinate per postcode prefix, products without a
+category --- are recorded with their evidence as \code{CLEANING\_DECISIONS} in
+\code{src/data\_load.py} and tabulated in Table~\ref{tab:quality}
+(Appendix~\ref{app:dictionary}).
+Numeric imputation (median) happens inside each model pipeline, never on the
+frame.
+
+\subsection{Analysis window and the three-way split}
+\label{sec:split}
+
+The raw file spans September 2016 to October 2018, but the first four months
+are a pilot contributing 326 orders against a 2018 run rate above 6{,}000 a
+month, and the final weeks are truncated mid-cycle
+(Figure~\ref{fig:coverage}), so the analysis is restricted to
+\textbf{2017-01-01 to 2018-08-31}, leaving \textbf{99{,}091} orders.
+
+Each period of the split has exactly one job. \textbf{Train} (2017-01-01 to
+2018-04-30, 73{,}008 orders) fits every model, with expanding-window
+cross-validation inside it tuning hyperparameters. \textbf{Validation}
+(2018-05-01 to 2018-06-30, 13{,}156) chooses between tuned models, sets every
+decision threshold and fits the margin-to-risk calibration. \textbf{Test}
+(2018-07-01 to 2018-08-31, 12{,}927) is scored once, at the end, for models
+already chosen, and is the held-out window the deployed application replays
+(Section~\ref{sec:deployment}). The split is chronological rather than
+stratified-random because the target drifts (Section~\ref{sec:eda}) and a
+random split would train on the future; the positive rate of each period is
+reported instead --- late orders 8.8\%, 5.0\% and 7.4\% of the training,
+validation and test periods, low reviews 15.8\%, 11.4\% and 11.0\%. It is
+additionally disjoint on the customer: a purely temporal cut can still put one
+person's orders on each side, so the \textbf{227} straddling buyers are removed
+from a clean test subset used in Section~\ref{sec:results-review}.
+
+\subsection{Leakage: one rule per prediction moment}
+\label{sec:leakage}
+
+Leakage here is not one rule but one per \emph{prediction moment}, because what
+is known depends on when the model runs. \emph{At checkout} nothing about
+fulfilment or the customer's opinion exists, so delivery dates and everything
+derived from them, the review score and its timestamps,
+\code{order\_approved\_at}, \code{shipping\_limit\_date} and
+\code{order\_status} are forbidden. \emph{At delivery} only the review and its
+timestamps remain forbidden: the delivery outcome is now history, and the brief
+itself lists ``delivery performance'' among the features for that problem.
+\code{assert\_no\_leakage(features, regime)} enforces the correct set before any
+model is fitted, is tested in both directions, and raises on an unrecognised
+regime name.
+
+\code{order\_estimated\_delivery\_date} is admissible at checkout and matters:
+the customer is shown that promise when the order is placed, so it precedes the
+outcome and encodes whatever Olist's own routing knew. It is a useful feature and
+--- Section~\ref{sec:results-reg} --- a poor prediction. The cost of getting the
+regime wrong is measurable: adding one forbidden column, the realised delivery
+time, lifts the late-delivery model's ROC-AUC from 0.589 to \textbf{1.000}
+(Figure~\ref{fig:leakage}). That is not a result; it is the target restated.

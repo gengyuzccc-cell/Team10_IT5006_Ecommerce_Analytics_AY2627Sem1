@@ -1,0 +1,62 @@
+\section{Feature Engineering}
+\label{sec:features}
+
+\subsection{The 36 features, and why each is there}
+
+Phase 1's 25 features carry forward unchanged: 6 calendar (month, weekday, hour,
+weekend, business hours, the Black Friday window), 11 basket-and-money
+(\code{log\_price}, \code{freight\_ratio}, \code{log\_weight}, volume, item and
+seller counts, instalments), 4 geographic (\code{log\_distance},
+\code{same\_state}, customer state, seller region), 2 for the promise and 2
+catalogue. The design carries no exact duplicates, and \code{purchase\_year} is
+absent because the split is chronological, so a linear term on it would
+extrapolate into an unseen year. Phase 2 added \textbf{eight track-record
+features}, taking the checkout set to 33 and the at-delivery set to 36: a
+seller's mean lead time, late rate, low-review rate and order count; a route's
+mean lead time; a category's low-review rate; and the platform's own lead time
+and late rate. The at-delivery regime additionally sees three columns describing
+how delivery actually went.
+
+Each group has a reason in the literature of Section~\ref{sec:lit} and a
+screen in the data. Geography and the promise are the backbone of delivery-time
+models \citep{salari2022delivery, liu2021lastmile, cui2024promise}; basket,
+money and calendar are the order-level controls of the logistics--rating
+studies \citep{deshpande2023logistics}; track records are the standard
+predictor in supply-chain delay models \citep{baryannis2019risk} in the
+time-respecting form of target encoding \citep{miccibarreca2001target}. The
+empirical screen was the correlation matrix of Figure~\ref{fig:correlations}:
+lead time correlates 0.39 with distance, 0.38 with the promised window, 0.17
+with freight and 0.07 with weight; promise and distance correlate 0.52 with
+each other, so both are kept and the trees resolve the overlap.
+Table~\ref{tab:features} in Appendix~\ref{app:features} lists all 36 features
+with definition, rationale and the moment each becomes knowable.
+
+\subsection{Track records, and the trap inside them}
+\label{sec:history}
+
+A seller's history is the strongest thing a marketplace knows about an order at
+checkout, and the easiest place here to leak, because of a distinction that is
+easy to miss: \emph{past} means the earlier order had \textbf{closed} before this
+one was placed --- not merely that it was placed earlier. A parcel bought last
+week that has not yet arrived has no lead time yet, so ordering the history by
+\emph{purchase} time would let every order average in outcomes that had not
+happened. That is Kaufman et al.'s \emph{illegitimate feature}
+\citep{kaufman2012leakage} in a convincing disguise, and it would be invisible in
+the metrics because it would simply look like a better model. Every aggregate is
+therefore an as-of join against the moment the earlier outcome became observable
+--- \code{order\_delivered\_customer\_date} for delivery,
+\code{review\_creation\_date} for reviews --- with a strict boundary.
+
+Two further guards. A mean over one previous order is noise rather than a rate,
+so below a floor of five prior orders the value is undefined and a fallback chain
+takes over (seller $\rightarrow$ route $\rightarrow$ seller state $\rightarrow$
+platform), after which 0.95\% of orders lack any history value; and cold start
+is information rather than error, since \code{hist\_seller\_n} carries how many
+past orders the estimate rests on. The platform features use a \textbf{28-day
+trailing window} rather than an expanding mean, because lead time halves across
+the analysis window, and their range, 5.2 to 17.1 days, is a direct measure of
+the drift the models must survive. Because a leak here would be invisible in
+the metrics, the construction is checked rather than reviewed: the validation
+suite rebuilds \code{hist\_seller\_lead\_days} from first principles for 200
+random orders and requires exact agreement, and a second check confirms the
+platform tracker \emph{lags} rather than anticipates (Appendix~\ref{app:repro}).

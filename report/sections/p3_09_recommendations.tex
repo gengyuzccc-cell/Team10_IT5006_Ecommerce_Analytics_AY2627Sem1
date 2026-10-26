@@ -1,0 +1,146 @@
+\section{Business Recommendations and Impact}
+\label{sec:insight}
+
+\subsection{What the models rely on}
+
+Importance is measured by permutation on the held-out window rather than by
+impurity on the training set, which inflates high-cardinality features
+\citep{strobl2007importance} --- not hypothetical with 74 product categories
+(Figure~\ref{fig:importance}). \textbf{Problem 2 has one dominant driver, and it
+is actionable.} How late the parcel was carries 0.206 of PR-AUC on its own, how
+long it took a further 0.074, the size of the order 0.045; nothing else clears
+0.011, and the top two account for \textbf{76.9\%} of total positive importance,
+which is why a single depth-limited tree captured 96\% of the achievable signal.
+For the customer-experience team that is good news: the driver is something the
+business already measures. \textbf{Problem 1A's importances must be read with
+care.} No single feature carries much --- the largest,
+\code{lead\_payment\_type}, costs 0.034 days of MAE --- because permutation
+importance understates correlated predictors, and the promise, the route and
+seller histories and the distance all encode overlapping information about how
+far and how long; the reading that survives is that this model has no single
+point of failure.
+
+\subsection{From a probability to a decision, and when not to act}
+\label{sec:cost}
+
+A probability is not a decision. Turning one into the other needs a cost, and
+Olist publishes none --- so what follows states its assumptions openly and treats
+the conclusions as shapes rather than numbers \citep{elkan2001cost}. The
+arithmetic is one line: acting is worth it only where
+$\text{precision} > c_{\text{action}} / c_{\text{miss}}$ (Table~\ref{tab:cost}).
+
+\begin{table}[htbp]
+\centering
+\caption{The decision layer under stated (not measured) costs. Break-even
+precision is what decides whether a flag is worth acting on at all.}
+\label{tab:cost}
+\footnotesize
+\begin{tabular}{@{}lrrrl@{}}
+\toprule
+\textbf{Flag} & \textbf{$c_{\text{action}}$ : $c_{\text{miss}}$} &
+\textbf{break-even} & \textbf{best achieved} & \textbf{verdict} \\
+\midrule
+Low-review risk, at delivery & R\$5 : R\$40  & 0.125 & 0.37 at the optimum & \best{act} \\
+Late-order flag, at checkout & R\$12 : R\$40 & 0.300 & 0.29 at any volume & do not expedite \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{The review flag pays, comfortably.} Contacting a customer who was never
+going to complain costs perhaps R\$5 of agent time; a 1--2 star review that could
+have been headed off costs perhaps R\$40 --- standing in for the damage
+\citet{deshpande2023logistics} trace through to seller sales. Break-even
+precision is 0.125 and the model reaches 0.369 at its expected-benefit optimum,
+flagging 1{,}927 of 12{,}855 delivered orders (15.0\%) of which 712 do go on to
+leave a low review, for a net \textbf{R\$1{,}466 per 1{,}000 delivered orders}
+(Figure~\ref{fig:threshold}); the margin is wide enough to survive a wrong cost
+estimate. Capacity changes how the optimum is used rather than where it is: a
+team that can work only 5\% of deliveries still captures R\$1{,}107 of those
+R\$1{,}466 (Table~\ref{tab:capacity}), because the top of the list is where the
+precision is, so the list is simply worked top-down until the agents run out.
+
+\textbf{The late-order flag does not pay --- for an expensive action.} This is the
+more useful finding, and reporting discrimination alone would have missed it.
+Expediting freight costs perhaps R\$12 against the same R\$40 of downstream
+damage, so break-even precision is 0.300 --- and the derived flag never reaches
+it: precision plateaus at \textbf{0.29} and falls as volume rises. A model with
+ROC-AUC 0.782 and 2.9$\times$ the no-skill floor is genuinely informative and
+still not worth paying R\$12 an order to act on. That changes \emph{which} action
+it justifies rather than making it useless: break-even falls with the cost of the
+intervention, and re-quoting the date and pre-warning the buyer cost almost
+nothing.
+
+\subsection{Recommendations by stakeholder}
+\label{sec:stakeholders}
+
+\textbf{Operations, at checkout} should work the four levers of
+Table~\ref{tab:levers} in order of cost. Every order gets the re-quoted date: the
+model's estimate is off by 3.90 days against the promise's 9.79, so the date
+shown at checkout can be tightened materially, which \citet{cui2024promise} show
+trades directly against returns and retention. Every order above the
+recall-oriented threshold of 0.11 gets a proactive notice, which covers five in
+six of those that will actually miss. Expedited freight is reserved for a manual
+review of the top one or two per cent of the late list, where precision is 0.27,
+and that policy is revisited only if expediting falls below about R\$11 an
+order. The track-record features and the weekly late series are the monitoring
+instruments: a seller whose late rate climbs, or a week in which the carrier's
+transit time lengthens while the promise does not, is the February--March 2018
+pattern beginning again (Appendix~\ref{app:lateness}).
+
+\textbf{Customer experience, at delivery} should receive each day's deliveries
+ranked by $p_{\text{low}}$ and work the list from the top. At ten contacts a day
+--- 4.8\% of deliveries --- 57\% of contacts reach a customer who would have left
+a 1--2 star review and a quarter of all such reviews are reached before they are
+written; twice the capacity reaches 38\% of them at 44\% precision
+(Table~\ref{tab:capacity}). The deployed application returns exactly this list.
+
+\textbf{The platform} should refit both models monthly and monitor the gap
+between predicted and realised lead time as the trigger: the drift of
+Section~\ref{sec:eda} is the dominant risk to both, and the over-prediction of
+Section~\ref{sec:results-segments} is what an unrefitted model looks like after
+four months. These are not two systems: the order flagged at checkout is the
+order that arrives late, and the order that arrives late is the one flagged for
+outreach.
+
+\subsection{Measuring what the business case assumes: the outreach pilot}
+\label{sec:pilot}
+
+Every reais figure above rests on one assumption the data cannot test: that
+contacting a customer who would have left a low review prevents it. Olist never
+contacted anyone, so the counterfactual is unobserved, and the evaluators were
+right to ask that it be stated and tested rather than assumed. The test is a
+randomised controlled experiment \citep{kohavi2009controlled}, and it can be
+sized from numbers this report already has (\code{src/pilot\_design.py};
+Table~\ref{tab:pilot} and Figure~\ref{fig:pilot}).
+
+\emph{Design.} Each day the model ranks the day's deliveries and the team takes
+the top $K$. Within that top $K$, orders are randomised 1:1 --- half contacted,
+half left alone --- and the outcome is the 1--2 star rate in each arm.
+Randomising \emph{inside} the list is what makes the comparison fair: both arms
+have the same predicted risk. The control arm's rate is already known: it is
+the model's precision at that daily $K$, 0.572 at ten contacts a day.
+\emph{Break-even} is one line of arithmetic: a contact pays when the reduction
+in the low-review probability times the review's cost exceeds the contact's
+cost, so the required absolute reduction is $5/40 = 0.125$ and the required
+relative reduction $0.125/0.572 = 21.9\%$ --- the contact must avert roughly one
+low review in five of those it reaches. \emph{Size.} For a two-sided
+two-proportion test at $\alpha = 0.05$, detecting a one-in-four reduction
+(0.572 to 0.429) with 80\% power needs 191 orders per arm, about \textbf{six
+weeks} at ten contacts a day (eight at 90\% power); a 30\% reduction needs 133
+per arm and four weeks; a 20\% reduction, which would not pay, needs 299 and
+nine weeks. The primary outcome is the review rate; the secondary is the
+realised benefit per contact, $(\hat p_{\text{control}} - \hat
+p_{\text{treated}}) \times \text{R\$}40 - \text{R\$}5$, which replaces the
+assumed benefit with a measured one.
+
+\subsection{Impact, and what it would take}
+
+Under the stated costs the review-risk list is worth about R\$1{,}466 per
+thousand delivered orders at the cost optimum and R\$1{,}107 at a 5\%
+capacity, before the pilot replaces the assumed benefit with a measured one. The operations levers cost nothing to apply and act on every
+order: a promise re-quoted at MAE 3.90 days instead of 9.79, and a pre-warning
+that reaches five in six of the orders that will miss. What it would take is
+modest: the three artifacts, the feature builders and a daily scoring job,
+which the deployed application already performs on a held-out day; a monthly
+refit; and six weeks of a randomised pilot before the customer-experience
+policy is scaled.

@@ -1,0 +1,151 @@
+\section{Literature Review}
+\label{sec:lit}
+
+This review was revised after the Phase 1 evaluation, which asked for four
+things the first version lacked: a distinction between survey-based perceived
+quality and platform ratings, applied rather than foundational citations for the
+model choices with a justification within the tree family, literature support
+for the features, and an evaluation aligned with a team's limited capacity.
+Each is addressed in the subsection it belongs to.
+
+\subsection{Fulfilment, delivery promises and satisfaction}
+
+The e-commerce service-quality literature is direct about which lever matters.
+\citet{parasuraman2005esqual} decompose electronic service quality into
+efficiency, \emph{fulfilment}, system availability and privacy, and find
+fulfilment --- the accuracy of delivery promises and the condition in which
+goods arrive --- among the strongest contributors to perceived quality;
+\citet{rao2011elsq} sharpen this into logistics terms across 260 online
+retailers. Both measure a survey construct. What a marketplace observes is a
+rating, and ratings are not surveys: they are written by a self-selected
+minority, J-shaped by acquisition and under-reporting biases
+\citep{hu2009jshaped, hu2017selfselection}, and moved by product, price and
+seller behaviour as much as by service \citep{dellarocas2003digitization}.
+Transactional evidence bridges the two: across more than 15 million marketplace
+orders, \citet{deshpande2023logistics} trace a chain --- logistics performance
+drives the rating a customer leaves, and that rating moves seller sales. That
+chain makes a low-review model a commercial instrument rather than a
+diagnostic, and the rating is the construct this project predicts.
+
+The promise itself is a second decision variable. \citet{cui2024promise} show
+that committing to a faster delivery date raises sales but increases returns and
+depresses retention, so an estimated delivery date is a business decision, not a
+forecast, and should not be expected to behave like one. Prediction pays only
+when it feeds a decision: \citet{kandula2021prescriptive} route machine-learned
+delivery outcomes into a scheduling optimiser and report cost savings of up to
+10.2\%, the pattern Table~\ref{tab:levers} follows. The same literature warns
+what is \emph{not} observable in an order table --- product expectations, seller
+communication, returns handling --- and any ceiling reported here must be read
+against that omission.
+
+\subsection{Model families for tabular transactional data}
+
+Regularised linear and logistic models are the natural baseline for structured
+data of this size: cheap, interpretable and, as Section~\ref{sec:results}
+shows, revealing about distribution shift. Within the tree family the
+literature knows three ways to improve on one tree: a random forest bags
+decorrelated trees to cut variance \citep{breiman2001rf}; boosting fits trees to
+residuals with shrinkage to cut bias \citep{friedman2001gbm}. Across the large
+empirical comparisons --- ten algorithms on eleven problems
+\citep{caruana2006empirical}, 179 classifiers on 121 datasets
+\citep{fernandezdelgado2014hundreds}, 45 tabular benchmarks against deep
+architectures \citep{grinsztajn2022tabular, shwartzziv2022tabular} and 41
+classifiers on business credit data \citep{lessmann2015benchmarking} ---
+boosted and bagged tree ensembles are the consistent top tier, boosting usually
+ahead by a small margin. In e-commerce and logistics the same family is the
+working choice: quantile regression forests for delivery times at JD.com
+\citep{salari2022delivery}, tree models for late supplier deliveries
+\citep{baryannis2019risk}, and random forests or boosted trees in the published
+studies on this very dataset \citep{fouad2023satisfaction,
+wangkiat2023satisfaction, gopinadh2025satisfaction}, none of which controls
+leakage by prediction moment --- the gap Section~\ref{sec:data} closes.
+
+The boosted learner used here is \code{HistGradientBoosting}: LightGBM's
+histogram-binned design \citep{ke2017lightgbm} implemented inside
+\code{scikit-learn} \citep{sklearn2024hgb}, so it stays within the brief's
+toolset rather than adding XGBoost \citep{chen2016xgboost}; it handles missing
+values natively, which the cold-start track-record features need; and it fits
+an order of magnitude faster than a comparable forest. Heterogeneous ensembles
+follow \citet{wolpert1992stacking}. The literature supplies the ranking; the
+ladder of Section~\ref{sec:method} supplies what it cannot --- whether, on this
+data, each rung beats the one below it.
+
+\subsection{Feature engineering on a relational order model}
+
+Deriving features from nine tables raises a problem a flat file does not: three
+of them are one-to-many against orders, so a naive join multiplies rows and
+reweights every aggregate towards multi-item orders, and each child relation
+must be aggregated to the analysis grain before joining. The feature groups then
+follow the literature. Origin--destination structure and distance are the
+backbone of published delivery-time models, from JD.com's arrival forecasts
+\citep{salari2022delivery} to last-mile travel-time predictors
+\citep{liu2021lastmile}; the quoted promise encodes what the platform's routing
+knew \citep{cui2024promise}; order size, value and freight are the order-level
+controls through which \citet{deshpande2023logistics} identify the
+logistics--rating link, and demand peaks stress fulfilment. The past performance
+of the parties to a transaction is the standard predictor in supply-chain delay
+models \citep{baryannis2019risk}, and an as-of aggregate of a key's earlier
+outcomes is the time-respecting form of target encoding
+\citep{miccibarreca2001target}, which must be fitted inside the
+cross-validation loop. The general vocabulary of counts, ratios and calendar
+encodings follows \citet{kuhn2019feature} and \citet{heaton2016feature}.
+
+Leakage is the dominant risk. \citet{kaufman2012leakage} formalise it as
+information about the target unavailable at prediction time and identify the two
+forms that threaten this dataset, post-outcome features and improper
+partitioning; \citet{kapoor2023leakage} show how routinely both survive peer
+review, across 294 affected papers in 17 fields. Ours are their
+\emph{illegitimate feature} and \emph{no clean separation} categories, and the
+framing makes leakage relative to a \emph{prediction moment}: delivery outcomes
+are forbidden when forecasting delivery and admissible when predicting a review
+not yet written. On partitioning, \citet{bergmeir2012cv} show that standard
+$k$-fold cross-validation is invalid for temporally ordered data.
+
+\subsection{Evaluation under imbalance, drift and capacity}
+
+Both classification targets are heavily imbalanced. \citet{saito2015prplot}
+show that precision--recall curves are more informative than ROC curves under
+strong imbalance, because ROC-AUC is insensitive to a large true-negative mass;
+PR-AUC is reported here against its no-skill floor, with raw accuracy as a
+diagnostic beside the majority-class rule. The obvious correction is one the
+project tests rather than applies: \citet{goorbergh2022imbalance} find that
+under-sampling, over-sampling and SMOTE \citep{chawla2002smote} do not improve
+discrimination and badly miscalibrate the resulting probabilities, and recommend
+adjusting the decision threshold on uncorrected data instead
+(Section~\ref{sec:results-review} reports the test). Calibrated probabilities
+are then a requirement, because a cost-sensitive decision multiplies them by a
+cost \citep{elkan2001cost}, and calibration is reported, not assumed
+\citep{niculescu2005calibration, platt1999probabilistic}.
+
+Regression errors are judged against a na\"ive benchmark
+\citep{hyndman2006accuracy}, decisive here because delivery performance improves
+dramatically across the window: under such a level shift $R^2$ against a
+baseline fitted on the past turns negative even for a useful model, whereas mean
+absolute error stays interpretable; this is concept drift \citep{gama2014drift},
+whose recommendation that non-stationary models be refitted with respect to
+time shapes the deployment plan. A ranking metric summarises the whole list,
+but a team contacts only the $K$ riskiest orders it can reach in a day, so the
+quantity that describes its day is the precision and recall of that top-$K$ ---
+the targeting view of \citet{provost2013data}, and the top-decile lift that
+profit-driven evaluation uses in place of accuracy \citep{verbeke2012churn,
+lessmann2015benchmarking}. Whether an intervention changes the outcome is a
+causal question observational data cannot answer; the standard instrument is a
+randomised controlled experiment \citep{kohavi2009controlled}, which
+Section~\ref{sec:pilot} designs. The deployment follows the practice
+literature: a model card stating what is served and where it fails
+\citep{mitchell2019modelcards}, and an explicit account of the version and data
+dependencies that quietly break production systems \citep{sculley2015debt}.
+All modelling uses \code{scikit-learn} pipelines \citep{pedregosa2011sklearn},
+keeping preprocessing inside each fold.
+
+\subsection{The gap addressed}
+
+The service-quality literature converges on fulfilment as the dominant
+observable driver of e-commerce satisfaction but measures it one way while the
+marketplace measures another; the tabular machine-learning literature converges
+on tree ensembles, and the e-commerce applications that use them rarely say
+\emph{when} the model would run; and the methodological literature is emphatic
+that on imbalanced, temporally ordered data the choice of split, metric and
+imbalance handling decides whether a number means anything. The contribution
+here is narrow and concrete: make the prediction moment a first-class design
+decision, measure its cost, and evaluate at the capacity the stakeholder has.
