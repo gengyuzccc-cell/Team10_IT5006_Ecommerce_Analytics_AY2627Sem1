@@ -1,5 +1,11 @@
 # Phase 2 compliance matrix
 
+> **Historical.** This checklist accompanied the Phase 2 submission and refers to
+> the Phase 2 report's section numbers. The final (Phase 3) checklist is
+> [`docs/requirements_checklist.md`](../docs/requirements_checklist.md), and the
+> application now lives in `deployment/` (`dashboard/app.py` is the Community
+> Cloud entry point).
+
 Every requirement in `phase 2 requirements.docx`, mapped to where it is satisfied.
 This is a working checklist for the team, not report filler — the report itself is
 6–8 body pages and does not contain this table.

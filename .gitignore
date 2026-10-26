@@ -26,6 +26,7 @@ data/processed/
 /broadway_clean.csv
 /phase 1 requirements.docx
 /phase 2 requirements.docx
+/phase 3 requirements.docx
 /phase1_req_dump.txt
 /NIBRS_DataDictionary.pdf
 /nibrs_diagram.pdf
@@ -60,3 +61,7 @@ desktop.ini
 
 # --- Local tool configuration -------------------------------------------
 .claude/
+
+# --- Submission archive ------------------------------------------------------
+# Built by build_submission.py from docs/; the pieces are tracked, the archive is not.
+*.zip
