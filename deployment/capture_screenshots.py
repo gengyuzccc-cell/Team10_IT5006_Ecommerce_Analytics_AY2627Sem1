@@ -26,17 +26,25 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUT = PROJECT_ROOT / "docs" / "screenshots"
 FIGURES = PROJECT_ROOT / "report" / "figures"
 URL = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8501"
+# Community Cloud wraps the app in an iframe and a toolbar; the bare app lives
+# at <app>/~/+/, which is what a clean screenshot should show.
+if "streamlit.app" in URL and "/~/+/" not in URL:
+    URL = URL.rstrip("/") + "/~/+/"
 
 
-def wait_for_app(page, timeout_s: int = 180) -> None:
+def wait_for_app(page, timeout_s: int = 300) -> None:
     """Community Cloud may need to wake the app; local runs take a few seconds."""
     deadline = time.time() + timeout_s
     while time.time() < deadline:
-        if page.locator("text=Yes, get this app back up").count():
-            page.locator("text=Yes, get this app back up").first.click()
-            time.sleep(15)
-        if page.locator("text=Olist Brazilian E-Commerce").count():
-            return
+        for frame in page.frames:
+            try:
+                if frame.locator("text=Yes, get this app back up").count():
+                    frame.locator("text=Yes, get this app back up").first.click()
+                    time.sleep(20)
+                if frame.locator("text=Olist Brazilian E-Commerce").count():
+                    return
+            except Exception:  # noqa: BLE001 - a frame may detach while waking
+                pass
         time.sleep(2)
     raise SystemExit("the application did not render in time")
 
