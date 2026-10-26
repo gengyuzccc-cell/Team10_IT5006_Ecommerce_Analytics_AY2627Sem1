@@ -510,11 +510,106 @@ def fig_lateness_anatomy() -> str:
     return save_fig(fig, "fig21_lateness_anatomy")
 
 
+def fig_cv_folds() -> str:
+    """F13. Fold-to-fold variation for every Problem 2 candidate (Phase 2 feedback).
+
+    Table 5 of the Phase 2 report carried one cross-validated number per model.
+    The Phase 2 feedback asked for the variation behind it, as Figure 1b showed
+    for the regression. Panel (a) is each candidate's PR-AUC on the five
+    expanding-window folds and the validation period: the folds move together,
+    because their difficulty differs far more than the candidates do, which is
+    the argument for ranking within a window rather than averaging across them.
+    Panel (b) is the summary beside the forward numbers: the fold-to-fold
+    standard deviation is roughly 0.09 against a gap of 0.001 between the best
+    two candidates, so cross-validation cannot separate them and the choice
+    between the deployed stack and the single boosted model is a tie.
+    """
+    folds = load("cv_folds.csv")
+    d = folds[folds["problem"] == "P2 low review"].copy()
+    d = d.sort_values(["family", "rung"]).reset_index(drop=True)
+    fold_cols = [f"fold{i}" for i in range(1, 6)]
+    windows = fold_cols + ["validation"]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(config.FIG_WIDTH, 3.4),
+                                   gridspec_kw={"width_ratios": [1.15, 1]})
+    x = np.arange(len(windows))
+    for _, r in d.iterrows():
+        colour = FAMILY_COLOUR.get(r["family"], M)
+        lw = 2.0 if r["deployed"] else 1.1
+        ls = "-" if r["family"] != "Linear" else "--"
+        ax1.plot(x, r[windows].astype(float).to_numpy(), marker="o", ms=3, lw=lw,
+                 ls=ls, color=colour, alpha=0.95 if r["deployed"] else 0.75,
+                 label=short(r["model"], 24) + (" (deployed)" if r["deployed"] else ""))
+    ax1.set_xticks(x)
+    ax1.set_xticklabels([w.replace("fold", "fold ") for w in windows], fontsize=7.5,
+                        rotation=20, ha="right")
+    ax1.set_ylabel("PR-AUC (out-of-sample)")
+    ax1.set_title("(a) Every candidate on every window", loc="left")
+    ax1.legend(fontsize=6.2, loc="upper left", ncol=2)
+
+    y = np.arange(len(d))
+    ax2.errorbar(d["cv_mean"], y, xerr=d["cv_sd"], fmt="o", color=M, capsize=3,
+                 ms=4, lw=1.1, label="CV mean ± fold-to-fold sd")
+    ax2.plot(d["validation"], y, "^", color=P, ms=5, label="validation period")
+    ax2.plot(d["test"], y, "s", color=A, ms=4, label="held-out test")
+    ax2.set_yticks(y)
+    ax2.set_yticklabels([short(m, 22) for m in d["model"]], fontsize=7.2)
+    ax2.set_xlabel("PR-AUC")
+    ax2.set_title("(b) Spread against the forward numbers", loc="left")
+    ax2.legend(fontsize=6.2, loc="upper left")
+    ax2.grid(axis="y", visible=False)
+    fig.tight_layout()
+    return save_fig(fig, "fig22_cv_folds")
+
+
+def fig_pilot() -> str:
+    """F14. How long the outreach pilot would take, by the effect it assumes.
+
+    Section 5.2's expected benefit assumes a contact prevents the low review it
+    reaches. The pilot of src/pilot_design.py randomises inside the top-K list;
+    this figure shows, for three daily capacities, (a) the weeks needed to
+    detect a given relative reduction at 80% power and (b) the net benefit per
+    contact that reduction would imply, with the break-even marked. The curve
+    says what the recommendation rests on: at ten contacts a day the contact
+    must avert roughly one low review in five to pay for itself, and a pilot
+    sized for a one-in-four effect runs about six weeks.
+    """
+    design = load("pilot_design.csv")
+    be = load("pilot_breakeven.csv").set_index("k_per_day")
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(config.FIG_WIDTH, 3.2))
+    colours = {5: GR, 10: P, 20: G}
+    for k, colour in colours.items():
+        d = design[design["k_per_day"] == k].sort_values("relative_reduction")
+        lab = f"{k} contacts a day"
+        ax1.plot(100 * d["relative_reduction"], d["weeks_80"], "o-", color=colour, ms=3.5,
+                 label=lab)
+        ax2.plot(100 * d["relative_reduction"], d["net_benefit_per_contact"], "o-",
+                 color=colour, ms=3.5, label=lab)
+        r_be = 100 * float(be.loc[k, "breakeven_relative_reduction"])
+        ax1.axvline(r_be, color=colour, ls=":", lw=0.9)
+        ax2.axvline(r_be, color=colour, ls=":", lw=0.9)
+    ax1.set_yscale("log")
+    ax1.set_xlabel("assumed reduction in low reviews among those contacted, %")
+    ax1.set_ylabel("weeks of pilot (80% power)")
+    ax1.set_title("(a) Pilot length by assumed effect", loc="left")
+    ax1.legend(fontsize=7)
+    ax1.text(0.98, 0.95, "dotted: break-even effect", transform=ax1.transAxes,
+             ha="right", va="top", fontsize=6.5, color=M)
+
+    ax2.axhline(0, color=M, lw=0.9)
+    ax2.set_xlabel("assumed reduction among those contacted, %")
+    ax2.set_ylabel("net benefit per contact (R$)")
+    ax2.set_title("(b) What the effect is worth, under the stated costs", loc="left")
+    ax2.legend(fontsize=7, loc="upper left")
+    fig.tight_layout()
+    return save_fig(fig, "fig23_pilot")
+
+
 # ===========================================================================
 FIGURES = [fig_regression_ladder, fig_regression_residuals, fig_late_routes,
            fig_low_review_curves, fig_calibration, fig_threshold_and_cost,
            fig_cv_protocol, fig_importance, fig_segments, fig_extrapolation,
-           fig_capacity, fig_lateness_anatomy]
+           fig_capacity, fig_lateness_anatomy, fig_cv_folds, fig_pilot]
 
 if __name__ == "__main__":
     use_report_style()

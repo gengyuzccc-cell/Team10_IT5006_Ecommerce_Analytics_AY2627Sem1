@@ -1,0 +1,56 @@
+problem,model,role,family,rung,estimator,parameter,value
+P1A lead time,LinearRegression,candidate,Linear,0,LinearRegression,(no free parameters),
+P1A lead time,Ridge,candidate,Linear,1,Ridge,alpha,659.9
+P1A lead time,DecisionTreeRegressor,candidate,Tree-based,0,DecisionTreeRegressor,max_depth,17
+P1A lead time,DecisionTreeRegressor,candidate,Tree-based,0,DecisionTreeRegressor,min_samples_leaf,158
+P1A lead time,DecisionTreeRegressor,candidate,Tree-based,0,DecisionTreeRegressor,max_features,0.8972
+P1A lead time,RandomForestRegressor,candidate,Tree-based,1,RandomForestRegressor,max_depth,14
+P1A lead time,RandomForestRegressor,candidate,Tree-based,1,RandomForestRegressor,min_samples_leaf,107
+P1A lead time,RandomForestRegressor,candidate,Tree-based,1,RandomForestRegressor,max_features,0.1645
+P1A lead time,RandomForestRegressor,candidate,Tree-based,1,RandomForestRegressor,n_estimators,150
+P1A lead time,HistGradientBoostingRegressor,candidate,Tree-based,2,HistGradientBoostingRegressor,max_iter,433
+P1A lead time,HistGradientBoostingRegressor,candidate,Tree-based,2,HistGradientBoostingRegressor,learning_rate,0.1065
+P1A lead time,HistGradientBoostingRegressor,candidate,Tree-based,2,HistGradientBoostingRegressor,max_leaf_nodes,36
+P1A lead time,HistGradientBoostingRegressor,candidate,Tree-based,2,HistGradientBoostingRegressor,min_samples_leaf,117
+P1A lead time,HistGradientBoostingRegressor,candidate,Tree-based,2,HistGradientBoostingRegressor,l2_regularization,9.142
+P1B late flag,LogisticRegression (tuned L2),candidate,Linear,1,LogisticRegression,C,0.004983
+P1B late flag,DecisionTreeClassifier,candidate,Tree-based,0,DecisionTreeClassifier,max_depth,9
+P1B late flag,DecisionTreeClassifier,candidate,Tree-based,0,DecisionTreeClassifier,min_samples_leaf,290
+P1B late flag,DecisionTreeClassifier,candidate,Tree-based,0,DecisionTreeClassifier,max_features,0.8779
+P1B late flag,RandomForestClassifier,candidate,Tree-based,1,RandomForestClassifier,max_depth,13
+P1B late flag,RandomForestClassifier,candidate,Tree-based,1,RandomForestClassifier,min_samples_leaf,132
+P1B late flag,RandomForestClassifier,candidate,Tree-based,1,RandomForestClassifier,max_features,0.2997
+P1B late flag,RandomForestClassifier,candidate,Tree-based,1,RandomForestClassifier,n_estimators,150
+P1B late flag,HistGradientBoostingClassifier,candidate,Tree-based,2,HistGradientBoostingClassifier,max_iter,426
+P1B late flag,HistGradientBoostingClassifier,candidate,Tree-based,2,HistGradientBoostingClassifier,learning_rate,0.07079
+P1B late flag,HistGradientBoostingClassifier,candidate,Tree-based,2,HistGradientBoostingClassifier,max_leaf_nodes,21
+P1B late flag,HistGradientBoostingClassifier,candidate,Tree-based,2,HistGradientBoostingClassifier,min_samples_leaf,30
+P1B late flag,HistGradientBoostingClassifier,candidate,Tree-based,2,HistGradientBoostingClassifier,l2_regularization,8.244
+P2 low review,LogisticRegression (tuned L2),candidate,Linear,1,LogisticRegression,C,8.431
+P2 low review,DecisionTreeClassifier,candidate,Tree-based,0,DecisionTreeClassifier,max_depth,14
+P2 low review,DecisionTreeClassifier,candidate,Tree-based,0,DecisionTreeClassifier,min_samples_leaf,211
+P2 low review,DecisionTreeClassifier,candidate,Tree-based,0,DecisionTreeClassifier,max_features,0.9631
+P2 low review,RandomForestClassifier,candidate,Tree-based,1,RandomForestClassifier,max_depth,12
+P2 low review,RandomForestClassifier,candidate,Tree-based,1,RandomForestClassifier,min_samples_leaf,44
+P2 low review,RandomForestClassifier,candidate,Tree-based,1,RandomForestClassifier,max_features,0.3491
+P2 low review,RandomForestClassifier,candidate,Tree-based,1,RandomForestClassifier,n_estimators,150
+P2 low review,HistGradientBoostingClassifier,candidate,Tree-based,2,HistGradientBoostingClassifier,max_iter,208
+P2 low review,HistGradientBoostingClassifier,candidate,Tree-based,2,HistGradientBoostingClassifier,learning_rate,0.02073
+P2 low review,HistGradientBoostingClassifier,candidate,Tree-based,2,HistGradientBoostingClassifier,max_leaf_nodes,28
+P2 low review,HistGradientBoostingClassifier,candidate,Tree-based,2,HistGradientBoostingClassifier,min_samples_leaf,18
+P2 low review,HistGradientBoostingClassifier,candidate,Tree-based,2,HistGradientBoostingClassifier,l2_regularization,0.01789
+P1A lead time,VotingRegressor (A+B),deployed ensemble,Ensemble,,VotingRegressor,weights (linear : tree),1:2
+P1A lead time,VotingRegressor (A+B),deployed member: linear,Ensemble,,LinearRegression,(no free parameters),
+P1A lead time,VotingRegressor (A+B),deployed member: tree,Ensemble,,HistGradientBoostingRegressor,max_iter,433
+P1A lead time,VotingRegressor (A+B),deployed member: tree,Ensemble,,HistGradientBoostingRegressor,learning_rate,0.1065
+P1A lead time,VotingRegressor (A+B),deployed member: tree,Ensemble,,HistGradientBoostingRegressor,max_leaf_nodes,36
+P1A lead time,VotingRegressor (A+B),deployed member: tree,Ensemble,,HistGradientBoostingRegressor,min_samples_leaf,117
+P1A lead time,VotingRegressor (A+B),deployed member: tree,Ensemble,,HistGradientBoostingRegressor,l2_regularization,9.142
+P2 low review,StackingClassifier (A+B),deployed ensemble,Ensemble,,StackingClassifier,meta-learner,LogisticRegression(C=1.0)
+P2 low review,StackingClassifier (A+B),deployed ensemble,Ensemble,,StackingClassifier,"meta-learner coefficients (linear, tree)","0.405, 5.572"
+P2 low review,StackingClassifier (A+B),deployed member: linear,Ensemble,,LogisticRegression,C,8.431
+P2 low review,StackingClassifier (A+B),deployed member: tree,Ensemble,,HistGradientBoostingClassifier,max_iter,208
+P2 low review,StackingClassifier (A+B),deployed member: tree,Ensemble,,HistGradientBoostingClassifier,learning_rate,0.02073
+P2 low review,StackingClassifier (A+B),deployed member: tree,Ensemble,,HistGradientBoostingClassifier,max_leaf_nodes,28
+P2 low review,StackingClassifier (A+B),deployed member: tree,Ensemble,,HistGradientBoostingClassifier,min_samples_leaf,18
+P2 low review,StackingClassifier (A+B),deployed member: tree,Ensemble,,HistGradientBoostingClassifier,l2_regularization,0.01789

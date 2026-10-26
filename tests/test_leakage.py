@@ -246,7 +246,7 @@ try:
     _st.cache_resource = lambda **k: (lambda f: f)
     _st.cache_data = lambda **k: (lambda f: f)
     sys.modules.setdefault("streamlit", _st)
-    sys.path.insert(0, str(PROJECT_ROOT / "dashboard"))
+    sys.path.insert(0, str(PROJECT_ROOT / "deployment"))
     import predict as PR
 
     art = PR.load_artifacts()
@@ -343,6 +343,98 @@ try:
           strike.loc[transit, "late_pct"] > 5 * strike.loc[control, "late_pct"])
 except (FileNotFoundError, KeyError) as exc:
     check("lateness tables exist (run src/lateness_anatomy.py)", False, repr(exc))
+
+
+# ===========================================================================
+print("\n9. Phase 3: what the report says is deployed is what is pickled (Phase 2 feedback)")
+# ---------------------------------------------------------------------------
+# The Phase 2 feedback found three places naming three different Problem 2
+# models. These checks tie the metadata, the pickles, the derived tables and
+# the documentation to one another so the statement cannot drift again.
+import json
+import modeling as M
+
+try:
+    meta = json.loads((PROJECT_ROOT / "models" / "model_metadata.json").read_text("utf-8"))
+    bundles = {k: M.load_model(PROJECT_ROOT / "models" / f)
+               for k, f in [("p1a", "p1a_leadtime.joblib"), ("p2", "p2_lowreview.joblib")]}
+    check("the pickled lead-time model carries the label model_metadata.json announces",
+          bundles["p1a"]["label"] == meta["p1a"]["label"],
+          f"{bundles['p1a']['label']} vs {meta['p1a']['label']}")
+    check("the pickled review model carries the label model_metadata.json announces",
+          bundles["p2"]["label"] == meta["p2"]["label"],
+          f"{bundles['p2']['label']} vs {meta['p2']['label']}")
+    check("the deployed review model is the StackingClassifier the report names",
+          type(bundles["p2"]["estimator"]).__name__ == "StackingClassifier"
+          and "Stacking" in meta["p2"]["label"])
+    check("the deployed lead-time model is the VotingRegressor the report names",
+          type(bundles["p1a"]["estimator"]).__name__ == "VotingRegressor"
+          and "Voting" in meta["p1a"]["label"])
+
+    # The ensembles must be built from the tuned winners, with the winners'
+    # hyperparameters - otherwise Appendix C would describe models nobody fitted.
+    hp = pd.read_csv(RESULTS / "hyperparameters.csv", dtype=str).fillna("")
+    cand = hp[hp["role"] == "candidate"].set_index(["problem", "estimator", "parameter"])["value"]
+    mismatches = []
+    for _, row in hp[hp["role"].str.startswith("deployed member")].iterrows():
+        key = (row["problem"], row["estimator"], row["parameter"])
+        if key in cand.index and cand.loc[key] != row["value"]:
+            mismatches.append(f"{key}: {cand.loc[key]} vs {row['value']}")
+    check("each deployed ensemble member carries its tuned candidate's hyperparameters",
+          not mismatches, "; ".join(mismatches))
+
+    # README and the final report must name the same deployed models.
+    docs = [PROJECT_ROOT / "README.md"]
+    docs += list((PROJECT_ROOT / "report" / "sections").glob("p3_*deployment*.tex"))
+    for doc in docs:
+        text = doc.read_text("utf-8")
+        check(f"{doc.name} names the deployed review model ({meta['p2']['label']})",
+              meta["p2"]["label"].split(" (")[0] in text)
+except (FileNotFoundError, KeyError) as exc:
+    check("deployment artifacts and hyperparameter table exist", False, repr(exc))
+
+# Fold-to-fold variation: the new table must be the selection tables re-read,
+# and its spread must match the cv_std the results tables already carried.
+try:
+    folds = pd.read_csv(RESULTS / "cv_folds.csv")
+    fold_cols = [f"fold{i}" for i in range(1, 6)]
+    recomputed_sd = folds[fold_cols].std(axis=1, ddof=0)
+    check("cv_folds.csv standard deviations are the population spread of the five folds",
+          np.allclose(recomputed_sd, folds["cv_sd"]))
+    p2 = folds[folds["problem"] == "P2 low review"].set_index("model")
+    clf = pd.read_csv(RESULTS / "clf_p2.csv").set_index("model")
+    check("cv_folds.csv agrees with the cv_std column of clf_p2.csv",
+          np.allclose(p2.loc[clf.index, "cv_sd"], clf["cv_std"])
+          and np.allclose(p2.loc[clf.index, "cv_mean"], clf["cv_pr_auc"]))
+    reg = pd.read_csv(RESULTS / "reg_p1a.csv").dropna(subset=["cv_mae"]).set_index("model")
+    p1a = folds[folds["problem"] == "P1A lead time"].set_index("model")
+    check("regression fold errors are stored as positive MAE and match reg_p1a.csv",
+          np.allclose(p1a.loc[reg.index, "cv_mean"], reg["cv_mae"]))
+    top = p2.sort_values("cv_mean", ascending=False)
+    check("the top two review candidates differ by less than a tenth of the fold-to-fold spread",
+          abs(top["cv_mean"].iloc[0] - top["cv_mean"].iloc[1]) < 0.1 * top["cv_sd"].iloc[0])
+except FileNotFoundError as exc:
+    check("cv_folds.csv exists (run src/selection_tables.py)", False, str(exc))
+
+# The outreach pilot: arithmetic the recommendation rests on.
+try:
+    import pilot_design as PD
+
+    design = pd.read_csv(RESULTS / "pilot_design.csv")
+    be = pd.read_csv(RESULTS / "pilot_breakeven.csv")
+    check("a larger assumed effect never needs a larger pilot",
+          all(g.sort_values("relative_reduction")["n_per_arm_80"].is_monotonic_decreasing
+              for _, g in design.groupby("k_per_day")))
+    check("the break-even reduction is the cost ratio divided by the control rate",
+          np.allclose(be["breakeven_relative_reduction"] * be["control_rate"],
+                      config.COSTS["outreach_cost"] / config.COSTS["low_review_cost"]))
+    check("at the break-even effect a contact is worth exactly nothing",
+          np.allclose((be["breakeven_absolute_reduction"] * config.COSTS["low_review_cost"]
+                       - config.COSTS["outreach_cost"]), 0))
+    check("the sample-size formula reproduces a textbook case (0.50 vs 0.40, 80% power: 388 per arm)",
+          PD.n_per_arm(0.50, 0.40, power=0.80) == 388)
+except FileNotFoundError as exc:
+    check("pilot tables exist (run src/pilot_design.py)", False, str(exc))
 
 
 # ===========================================================================
