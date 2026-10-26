@@ -21,12 +21,14 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 import theme
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MODELS_DIR = PROJECT_ROOT / "models"
+PLOT_CFG = {"displayModeBar": False, "responsive": True}
 
 # Columns a batch upload must provide; everything else is derived.
 BATCH_COLUMNS = [
@@ -349,7 +351,7 @@ def render_predict(df: pd.DataFrame) -> None:
 
     # theme.note() emits raw HTML, so this has to be HTML - markdown asterisks
     # would render literally.
-    verdict = ("<b>Flag for operations.</b> " if result["late_flag"]
+    verdict = ("<b>Pre-warn the buyer.</b> " if result["late_flag"]
                else "<b>No action needed.</b> ")
     st.markdown(
         theme.note(
@@ -358,9 +360,12 @@ def render_predict(df: pd.DataFrame) -> None:
             + (f"The model expects this parcel to arrive "
                f"{abs(result['margin_days']):.1f} days "
                f"{'after' if result['margin_days'] > 0 else 'before'} the promised "
-               f"date. Orders are flagged above a {100*late_thr:.0f}% risk, an "
-               "operating point chosen on the validation period, not on the test "
-               "window.<br><br>"
+               f"date, with a typical error of ±{mae:.1f} days. Orders are flagged "
+               f"above a {100*late_thr:.0f}% risk of missing the promise: a "
+               "recall-oriented operating point chosen on the validation period "
+               "for the near-free pre-warning lever, which catches five in six of "
+               "the orders that will miss. Expediting is reserved for the very top "
+               "of the ranked late list, where precision is highest.<br><br>"
                f"The review risk shown is conditional on that forecast, so it "
                f"inherits the forecast's error. Once the parcel actually lands, "
                f"re-score with the realised delivery date - that is the "
@@ -501,6 +506,40 @@ def render_triage(scored: pd.DataFrame) -> None:
 # ===========================================================================
 # UI - model card
 # ===========================================================================
+@st.cache_data(show_spinner=False)
+def load_table(name: str) -> pd.DataFrame | None:
+    """A result table written by the analysis scripts, or None when absent.
+
+    The model card recomputes nothing: every table it shows is one the report
+    quotes, read from report/results/ exactly as the scripts wrote it.
+    """
+    path = PROJECT_ROOT / "report" / "results" / name
+    return pd.read_csv(path) if path.exists() else None
+
+
+def _as_pickled(bundle: dict) -> str:
+    """The estimator class and, for an ensemble, its members - read from the artifact."""
+    est = bundle["estimator"]
+    if not hasattr(est, "estimators"):
+        return type(est).__name__
+    parts = []
+    for _name, member in est.estimators:
+        inner = member.steps[-1][1] if hasattr(member, "steps") else member
+        parts.append(type(inner).__name__)
+    text = f"{type(est).__name__} of " + " + ".join(parts)
+    if getattr(est, "weights", None) is not None:
+        text += f" · weights {':'.join(str(w) for w in est.weights)}"
+    fe = getattr(est, "final_estimator_", None)
+    if fe is not None:
+        text += f" · meta-learner {type(fe).__name__}"
+    return text
+
+
+def _artifact(name: str) -> str:
+    path = MODELS_DIR / name
+    return f"{name} · {path.stat().st_size / 1e3:.0f} KB" if path.exists() else name
+
+
 def render_model_card() -> None:
     try:
         art = load_artifacts()
@@ -511,8 +550,8 @@ def render_model_card() -> None:
     meta = art["meta"]
     st.markdown(
         theme.section("Model card",
-                      "What was trained, on what, how well it does, and where it "
-                      "should not be trusted."),
+                      "What is deployed, on what it was trained, how well it does, "
+                      "how much that varies, and where it should not be trusted."),
         unsafe_allow_html=True)
 
     st.markdown(
@@ -530,40 +569,62 @@ def render_model_card() -> None:
         ]),
         unsafe_allow_html=True)
 
-    st.markdown("#### Selected models")
+    # -- what is deployed, read from the artifacts themselves ---------------
+    st.markdown("#### What is deployed")
     st.dataframe(pd.DataFrame([
         {"Problem": "P1A · lead time (regression, at checkout)",
-         "Model": meta["p1a"]["label"], "Family": meta["p1a"]["family"],
-         "Selected on": f"CV MAE {meta['p1a']['cv_mae']:.3f}",
-         "Test": f"MAE {meta['p1a']['test_mae']:.2f} d · "
-                 f"RMSE {meta['p1a']['test_rmse']:.2f} · R² {meta['p1a']['test_r2']:.3f}"},
+         "Deployed model": meta["p1a"]["label"],
+         "As pickled": _as_pickled(art["p1a"]),
+         "Artifact": _artifact("p1a_leadtime.joblib"),
+         "Decision rule": "re-quote with the estimate; flag via P1B",
+         "Test": f"MAE {meta['p1a']['test_mae']:.2f} d · RMSE {meta['p1a']['test_rmse']:.2f} · "
+                 f"R² {meta['p1a']['test_r2']:.3f}"},
         {"Problem": "P1B · late vs promise (classification, at checkout)",
-         "Model": meta["p1b"]["label"], "Family": meta["p1b"]["route"],
-         "Selected on": "PR-AUC against the direct classifiers",
-         "Test": f"ROC {meta['p1b']['test_roc_auc']:.3f} · "
-                 f"PR-AUC {meta['p1b']['test_pr_auc']:.3f} · "
+         "Deployed model": meta["p1b"]["label"],
+         "As pickled": _as_pickled(art["platt"])
+                       + " on (predicted − promised days), fitted on validation",
+         "Artifact": _artifact("p1b_margin_to_risk.joblib"),
+         "Decision rule": f"flag when risk ≥ {meta['p1b']['threshold']:.2f}",
+         "Test": f"ROC {meta['p1b']['test_roc_auc']:.3f} · PR-AUC {meta['p1b']['test_pr_auc']:.3f} · "
                  f"balanced acc {meta['p1b']['test_balanced_accuracy']:.3f}"},
         {"Problem": "P2 · low review (classification, at delivery)",
-         "Model": meta["p2"]["label"], "Family": meta["p2"]["family"],
-         "Selected on": f"CV PR-AUC {meta['p2']['cv_pr_auc']:.3f}",
-         "Test": f"ROC {meta['p2']['test_roc_auc']:.3f} · "
-                 f"PR-AUC {meta['p2']['test_pr_auc']:.3f} · "
+         "Deployed model": meta["p2"]["label"],
+         "As pickled": _as_pickled(art["p2"]),
+         "Artifact": _artifact("p2_lowreview.joblib"),
+         "Decision rule": f"flag when risk ≥ {meta['p2']['threshold']:.2f}; rank for the top-K",
+         "Test": f"ROC {meta['p2']['test_roc_auc']:.3f} · PR-AUC {meta['p2']['test_pr_auc']:.3f} · "
                  f"F1 {meta['p2']['test_f1']:.3f}"},
     ]), hide_index=True, use_container_width=True)
+    st.caption(
+        "The review model that is served is the StackingClassifier the pre-registered "
+        "selection rule chose (best mean rank over the three most recent out-of-sample "
+        "windows), built from the tuned logistic regression and the tuned "
+        "HistGradientBoosting classifier. The single boosted model sits within 0.001 "
+        "PR-AUC of it on the test window; the ensemble is kept because switching after "
+        "seeing the test window would be selecting on the test set. Both artifacts are "
+        "a few hundred kilobytes.")
 
-    c1, c2 = st.columns(2)
+    c1, c2 = st.columns(2, gap="medium")
     with c1:
-        st.markdown("#### Chosen hyperparameters")
-        st.json({"P1A " + meta["p1a"]["label"]: meta["p1a"]["params"],
-                 "P2 " + meta["p2"]["label"]: meta["p2"]["params"]}, expanded=False)
         st.markdown("#### Training")
         st.markdown(
             f"- Window **{meta['window'][0]} → {meta['window'][1]}**\n"
             f"- Train to **{meta['train_end']}**, validation to **{meta['val_end']}**, "
-            f"test thereafter\n"
+            f"test thereafter — scored once, for models already chosen\n"
             f"- Chronological split, disjoint on `customer_unique_id`\n"
             f"- Seed **{meta['seed']}**, {meta['n_search_iter']} randomised search "
-            f"draws per model, expanding-window CV")
+            f"draws per model (six for the random forests), five expanding-window folds\n"
+            f"- Thresholds and the margin-to-risk mapping fitted on the validation period")
+        hp = load_table("hyperparameters.csv")
+        if hp is not None:
+            with st.expander("Selected hyperparameters (every searched model and the deployed members)"):
+                problem = st.selectbox("Problem", sorted(hp["problem"].unique()), index=2,
+                                       key="hp_problem")
+                show = hp[hp["problem"] == problem][["model", "role", "parameter", "value"]]
+                st.dataframe(show, hide_index=True, use_container_width=True, height=320)
+                st.caption("Searched with RandomizedSearchCV, scored by expanding-window "
+                           "cross-validation; the deployed ensembles carry exactly the "
+                           "winning members' values (asserted in tests/test_leakage.py).")
     with c2:
         st.markdown("#### Where not to trust this")
         st.markdown(
@@ -578,11 +639,44 @@ def render_model_card() -> None:
             "- **Review risk is scored at delivery.** Asked at checkout, the same "
             "target is far weaker, because the variable that matters most has not "
             "happened yet.\n"
+            "- **The value of outreach is assumed, not measured.** The cost analysis "
+            "assumes a contact prevents the low review it reaches; nobody in this "
+            "data was ever contacted. The pilot below is how that would be tested.\n"
             "- **A new seller has no track record.** The history features fall back "
             "to route, then state, then platform, and the model is told so.\n"
             "- **These are decision scores for triage, not entitlements.** They "
             "must not be used to penalise a seller or price a customer.")
 
+    # -- fold-to-fold variation (Phase 2 feedback) ---------------------------
+    folds = load_table("cv_folds.csv")
+    if folds is not None:
+        st.markdown("#### How much the candidates vary from fold to fold")
+        st.caption(
+            "Every Problem 2 candidate on the five expanding-window folds and the "
+            "validation period, with the test score beside them. The fold-to-fold "
+            "spread (about ±0.09) is a property of the windows — the 2017 folds are "
+            "harder and have a higher base rate — and it dwarfs the gap between the "
+            "best candidates (under 0.001), which is why selection ranks models "
+            "within each window rather than averaging scores across them.")
+        p2 = folds[folds["problem"] == "P2 low review"].sort_values("mean_rank_recent")
+        fold_cols = [f"fold{i}" for i in range(1, 6)]
+        table = p2[["model"] + fold_cols + ["validation", "cv_mean", "cv_sd", "test",
+                                            "mean_rank_recent"]].copy()
+        table.columns = (["model"] + [f.replace("fold", "fold ") for f in fold_cols]
+                         + ["validation", "CV mean", "fold sd", "test", "mean rank (recent 3)"])
+        st.dataframe(table.round(3), hide_index=True, use_container_width=True)
+        fig = go.Figure()
+        windows = fold_cols + ["validation", "test"]
+        for _, r in p2.iterrows():
+            fig.add_scatter(x=[w.replace("fold", "fold ") for w in windows],
+                            y=r[windows].astype(float).to_numpy(), mode="lines+markers",
+                            name=r["model"], line=dict(width=3 if r["deployed"] else 1.5),
+                            opacity=1.0 if r["deployed"] else 0.7)
+        fig.update_layout(height=360, yaxis_title="PR-AUC (out of sample)",
+                          title="Problem 2: every candidate on every window")
+        st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG)
+
+    # -- capacity ------------------------------------------------------------
     cap = load_capacity()
     if cap is not None and len(cap):
         st.markdown("#### What a ranked list delivers at a fixed capacity")
@@ -591,8 +685,8 @@ def render_model_card() -> None:
             "window. A customer-experience team that can contact K% of the day's "
             "deliveries works the list from the top; precision stays above the "
             "break-even of 0.125 at every capacity shown, so the team's capacity, "
-            "not the model's threshold, is what limits the value. Added after the "
-            "Milestone 1 feedback; see report Section 4.4.")
+            "not the model's threshold, is what limits the value. The Replay-a-day "
+            "tab shows the same list for any single test day.")
         show = (cap[cap["k_pct"].isin([1, 2, 5, 10, 15, 20, 30])]
                 [["k_pct", "precision_at_k", "recall_at_k", "lift_at_k"]]
                 .rename(columns={"k_pct": "capacity K (% of deliveries)",
@@ -601,11 +695,50 @@ def render_model_card() -> None:
                                  "lift_at_k": "lift vs random"}))
         st.dataframe(show.round(3), hide_index=True, use_container_width=True)
 
+    # -- the pilot that would measure what the cost analysis assumes ---------
+    be = load_table("pilot_breakeven.csv")
+    if be is not None and len(be):
+        st.markdown("#### Sizing the outreach pilot")
+        st.caption(
+            "Randomise inside the top-K list — contact half, leave half — and compare "
+            "the 1–2 star rate of the two arms. The control arm's rate is the model's "
+            "precision at that daily capacity, already measured; the pilot measures "
+            "the treated arm. Two-sided two-proportion test at alpha = 0.05.")
+        try:
+            import pilot_design as PD
+
+            be = be.set_index("k_per_day")
+            k1, k2, k3 = st.columns(3)
+            k = k1.selectbox("Daily capacity K", be.index.tolist(), index=1, key="pilot_k")
+            rr = k2.slider("Assumed reduction in low reviews among those contacted (%)",
+                           5, 60, 25, step=5, key="pilot_rr") / 100
+            power = k3.radio("Power", ["80%", "90%"], horizontal=True, key="pilot_power")
+            p0 = float(be.loc[k, "control_rate"])
+            p1 = p0 * (1 - rr)
+            n = PD.n_per_arm(p0, p1, power=0.8 if power == "80%" else 0.9)
+            weeks = int(np.ceil(2 * n / k / 7))
+            net = (p0 - p1) * 40.0 - 5.0
+            breakeven = float(be.loc[k, "breakeven_relative_reduction"])
+            st.markdown(theme.kpi_row([
+                ("Control-arm rate", f"{100 * p0:.0f}%",
+                 f"precision of the top-{k} each day", theme.PRIMARY),
+                ("Orders per arm", f"{int(n):,}",
+                 f"about {weeks} weeks at {k} contacts a day", theme.GOLD),
+                ("Net benefit per contact", f"R$ {net:+.2f}",
+                 "under R$5 : R$40", theme.GREEN if net > 0 else theme.ACCENT),
+                ("Break-even effect", f"{100 * breakeven:.0f}%",
+                 "reduction needed for a contact to pay", theme.ACCENT),
+            ]), unsafe_allow_html=True)
+        except Exception as exc:  # noqa: BLE001
+            st.caption(f"Pilot calculator unavailable: `{type(exc).__name__}: {exc}`")
+
     st.markdown("#### Reproducibility")
-    st.code("python src/train_models.py      # refits everything and rewrites models/\n"
-            "python src/capacity_metrics.py  # Precision@K / Recall@K from the saved predictions\n"
-            "python tests/test_leakage.py    # validation checks, incl. the history features\n"
-            "python src/phase2_stats.py      # regenerates every number in the report",
+    st.code("python tests/test_leakage.py     # validation checks, incl. deployed-model consistency\n"
+            "python src/train_models.py       # refits everything and rewrites models/\n"
+            "python src/capacity_metrics.py   # Precision@K / Recall@K from the saved predictions\n"
+            "python src/selection_tables.py   # fold-to-fold variation and selected hyperparameters\n"
+            "python src/pilot_design.py       # the outreach pilot sizing shown above\n"
+            "python src/phase3_stats.py       # regenerates every number in the final report",
             language="bash")
     st.caption(f"Artifacts built {art['p1a'].get('saved_at', 'n/a')} on "
                f"scikit-learn {art['p1a'].get('sklearn_version', 'n/a')}.")

@@ -2,18 +2,21 @@
 Olist Brazilian E-Commerce - IT5006 Group 10 dashboard.
 
 Run locally:
-    python src/train_models.py      # once, fits the models into models/
-    streamlit run dashboard/app.py
+    streamlit run deployment/app.py     # the application
+    streamlit run dashboard/app.py      # the Community Cloud entry point; same thing
 
-Two halves, matching the two project phases:
+Three parts, matching the three project phases:
 
   Phase 1  five exploratory tabs over the joined nine-table order frame.
   Phase 2  a scoring tab that serves the fitted models, and a model card.
+  Phase 3  a replay of the held-out test window, one day at a time, and a model
+           card that states what is deployed, how the candidates varied fold to
+           fold, and how the outreach pilot would be sized.
 
-Both halves read the same src/data_load.py and src/features.py the notebooks and
-the reports use, so no figure here can disagree with either PDF. The Phase 2 tabs
+All of it reads the same src/data_load.py and src/features.py the notebooks and
+the reports use, so no figure here can disagree with any PDF. The model tabs
 load their artifacts lazily, so a visitor who only browses the EDA never pays for
-unpickling a model.
+unpickling a model. deployment/README.md documents usage and the CSV contract.
 """
 from __future__ import annotations
 
@@ -31,6 +34,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import predict
+import replay
 import theme
 
 st.set_page_config(
@@ -86,7 +90,7 @@ except (FileNotFoundError, OSError):
     st.error(
         f"**Source data not found.** Expected the nine Olist CSVs in "
         f"`data/raw/olist/`.\n\nClone the full repository and run this app from "
-        f"the project root:\n\n```\nstreamlit run dashboard/app.py\n```"
+        f"the project root:\n\n```\nstreamlit run deployment/app.py\n```"
     )
     st.stop()
 except AssertionError as exc:
@@ -107,7 +111,7 @@ except Exception as exc:  # noqa: BLE001 - last-resort guard for a public app
 # ===========================================================================
 with st.sidebar:
     st.markdown("### 📦 Olist Explorer")
-    st.caption("IT5006 · Group 10 · Phases 1–2")
+    st.caption("IT5006 · Group 10 · Phases 1–3")
 
     with st.expander("ℹ️  How to use this dashboard", expanded=False):
         st.markdown(
@@ -117,10 +121,23 @@ with st.sidebar:
             "4. **Geography** — where buyers and sellers are, and what that costs.\n"
             "5. **Satisfaction** — how lateness turns into bad reviews.\n"
             "6. **Data quality** — what is missing and why.\n"
-            "7. **Predict** — score one order or a whole CSV against the fitted "
-            "models. Not affected by the filters.\n"
-            "8. **Model card** — how the models were built and where they fail.\n\n"
+            "7. **Predict** — score one order or a whole CSV against the deployed "
+            "models, and get a top-K triage list. Not affected by the filters.\n"
+            "8. **Replay a day** — the deployed models on a held-out test day, "
+            "ranked, with the real outcomes revealable.\n"
+            "9. **Model card** — what is deployed, how well it does, where it "
+            "fails, and how to reproduce it.\n\n"
             "Charts are interactive: drag to zoom, double-click to reset."
+        )
+
+    with st.expander("🎬  Five-minute tour", expanded=False):
+        st.markdown(
+            "- **Delivery** → the weekly chart: lead time halves, lateness spikes.\n"
+            "- **Satisfaction** → late delivery turns 9% low reviews into 54%.\n"
+            "- **Predict** → score the default São Paulo → Rio order; change the "
+            "promised date and watch the late risk move.\n"
+            "- **Replay a day** → pick 16 July 2018, capacity 10, reveal outcomes.\n"
+            "- **Model card** → the deployed estimators and the fold-to-fold table."
         )
 
     st.markdown("#### Filters")
@@ -176,14 +193,16 @@ with st.sidebar:
 # ===========================================================================
 st.markdown(
     theme.masthead(
-        "IT5006 · Group 10 · Exploration and Prediction",
+        "IT5006 · Group 10 · Exploration, Prediction and Deployment",
         "Olist Brazilian E-Commerce, 2017–2018",
         f"{len(DF):,} orders joined from <b>nine relational tables</b> · one row per "
         f"order · {DF['lead_category'].nunique()} product categories across "
         f"{DF['customer_state'].nunique()} states. The first five tabs explore the "
-        f"data; <b>Predict</b> serves the fitted models and <b>Model card</b> "
-        f"reports what they can and cannot do. Every view reads the same pipeline "
-        f"as the reports, so the numbers cannot diverge.",
+        f"data; <b>Predict</b> serves the deployed models, <b>Replay a day</b> runs "
+        f"them over a held-out test day with the outcomes revealable, and "
+        f"<b>Model card</b> states what is deployed and where it should not be "
+        f"trusted. Every view reads the same pipeline as the reports, so the "
+        f"numbers cannot diverge.",
     ),
     unsafe_allow_html=True,
 )
@@ -192,9 +211,9 @@ if d.empty:
     st.warning("**No orders match the current filters.** Widen the selection in the sidebar.")
     st.stop()
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
     ["Overview", "Delivery", "Geography", "Satisfaction", "Data quality",
-     "🔮 Predict", "Model card"]
+     "🔮 Predict", "⏮ Replay a day", "Model card"]
 )
 
 
@@ -592,15 +611,23 @@ with tab6:
 
 
 # ===========================================================================
-# Tab 7 - Model card  (Phase 2)
+# Tab 7 - Replay a held-out test day  (Phase 3)
 # ===========================================================================
 with tab7:
+    replay.render_replay()
+
+
+# ===========================================================================
+# Tab 8 - Model card  (Phases 2-3)
+# ===========================================================================
+with tab8:
     predict.render_model_card()
 
 
 st.markdown("---")
 st.caption(
-    "IT5006 Fundamentals of Data Analytics · Group Project · National University "
-    "of Singapore. Built with Streamlit. Source: "
+    "IT5006 Fundamentals of Data Analytics · Group Project, Group 10 · National "
+    "University of Singapore. Built with Streamlit and scikit-learn. Source code, "
+    "notebooks and the final report: "
     "https://github.com/gengyuzccc-cell/Team10_IT5006_Ecommerce_Analytics_AY2627Sem1"
 )
