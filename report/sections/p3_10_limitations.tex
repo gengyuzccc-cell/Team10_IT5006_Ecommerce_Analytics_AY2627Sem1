@@ -27,8 +27,10 @@ effect of reaching them --- and the possibility that an unsolicited contact
 lowers a rating --- is unobserved. The precision and recall figures stand on
 their own; the reais figures do not, and should be read as the value of the
 policy \emph{if} the pilot of Section~\ref{sec:pilot} finds the contact averts at
-least one low review in five. Until it runs, the recommendation is to pilot at
-ten contacts a day for six weeks, not to scale.
+least one low review in five. Part of the assumption can be checked, and fails
+for late parcels: most of their low reviews are written before delivery, so the
+value is restated on the reachable share (Appendix~\ref{app:timing}). Until the
+pilot runs, the recommendation is to pilot for six weeks, not to scale.
 
 \paragraph{What the data does not contain, and what rests on assumption.}
 The target of Problem 2 is a platform rating, with the self-selection
@@ -38,9 +40,7 @@ customer who never reviews. The service-quality literature identifies product
 expectation gaps, seller communication and returns handling among the drivers of
 dissatisfaction \citep{parasuraman2005esqual, rao2011elsq}; none appears in these
 nine tables, so the Problem 2 residual is unobserved cause rather than noise, and
-the free-text review columns are too sparse to recover it. Olist publishes no
-cost figures, so Section~\ref{sec:cost} reports break-even precision, the
-quantity that decides the recommendation and moves with the assumption.
+the free-text review columns are too sparse to recover it.
 Selection votes on three out-of-sample windows --- the right trade under drift,
 but a small sample: Section~\ref{sec:results-late} records a case where the
 rule preferred a model that does not transfer, and
@@ -77,8 +77,7 @@ fold-to-fold spread is too wide to tell the best candidates apart --- so
 selection belongs on several recent out-of-sample windows judged by rank, and
 even then it can fail. Weighting the loss for class imbalance leaves ranking
 unchanged and inflates predicted risk threefold, so the threshold is the right
-lever. Raw PR-AUC is not comparable across periods with different base rates
-while its lift over the floor is. And the most useful business results are
+lever. And the most useful business results are
 negative: an informative flag that does not justify an expensive intervention,
-and a paper gain of R\$1{,}466 per thousand orders that is worth a six-week
+and a paper gain of R\$775--1{,}466 per thousand orders that is worth a six-week
 experiment before it is worth anything.

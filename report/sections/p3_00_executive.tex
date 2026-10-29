@@ -42,17 +42,19 @@ risk exceeds 11\%, both nearly free; it should \emph{not} expedite on the flag,
 whose precision never clears the 0.30 a R\$12 intervention would need. Customer
 experience should work each day's deliveries from the top of the review-risk
 list to its capacity: at illustrative costs of R\$5 per contact and R\$40 per
-low review the policy is worth about R\$1{,}466 per thousand delivered orders.
-Because that figure assumes a contact prevents the review it reaches ---
+low review the policy is worth up to R\$1{,}466 per thousand delivered orders,
+or R\$775 counting only customers who have not yet written --- for a late parcel
+87\% of low reviews precede delivery, so its buyer is reached on the promised
+date instead. Because that figure assumes a contact prevents the review it reaches ---
 something no historical data can show --- the report sizes the pilot that would
 test it: a randomised hold-out inside the daily list, about six weeks at ten
 contacts a day, with break-even at roughly one averted review in five.
 
 Everything is deployed and reproducible. A Streamlit application at
 \url{https://team10-it5006-olist.streamlit.app} serves the three models on
-single orders and batch files, returns the ranked triage list, replays any day
-of the held-out test window with the real outcomes revealable, and carries a
-model card stating exactly which estimators are deployed. The repository holds
+single orders and batch files, returns the ranked triage list, replays any
+held-out test day with its outcomes revealable and states in a model card which
+estimators are deployed. The repository holds
 the source tables, ten executed notebooks, the fitted artifacts and the scripts
 that regenerate every number in this document; a suite of \checkcount{}
 validation checks ties the metadata, the pickled models, the result tables and

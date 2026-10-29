@@ -227,12 +227,14 @@ three reach a customer who would in fact have left a 1--2 star review, 6.1
 times the rate of contacting at random, and those contacts cover 30.7\% of all
 such reviews. Precision stays above the 0.125 break-even at every capacity
 tried, so the policy is not a threshold but an instruction: work the day's list
-from the top until the agents run out. The F1-tuned threshold corresponds to a
-capacity of 7.6\% and the cost-optimal one to 15.0\%
-(Figure~\ref{fig:capacity}a), points on this curve rather than decisions of
-their own. The daily rows cut the list per day, as a team must; at ten contacts
-a day precision is 0.572 and recall 0.248, a little below the pooled 5\% row
-because days differ in how many risky orders they hold. \textbf{The derived late
+from the top until the agents run out; the F1-tuned and cost-optimal thresholds
+are points on this curve (Figure~\ref{fig:capacity}a). At ten contacts a day
+precision is 0.572 and recall 0.248, a little below the pooled 5\% row because
+days differ in how many risky orders they hold. \textbf{Not every hit can still
+be reached}: for a late parcel the survey goes out once the promise passes and
+87\% of its low reviews precede delivery, so of the 0.572, 0.352 have not yet
+written and 0.220 already have, against 0.093 and 0.017 at random --- still
+nearly three times break-even (Appendix~\ref{app:timing}). \textbf{The derived late
 flag dominates the direct classifier at every capacity}, by a factor of two to
 nearly three on precision. \textbf{And it never clears the break-even for an
 expensive action}: its precision peaks at 0.274 and falls as $K$ grows, under
