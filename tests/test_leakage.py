@@ -438,6 +438,42 @@ except FileNotFoundError as exc:
 
 
 # ===========================================================================
+print("\n10. Phase 3: when the review is written (src/review_timing.py)")
+try:
+    tcap = pd.read_csv(RESULTS / "review_timing_capacity.csv")
+    check("every call-list hit is either still reachable or already written",
+          np.allclose(tcap["reachable_precision"] + tcap["already_written_precision"],
+                      tcap["precision"]))
+    pred = pd.read_csv(RESULTS / "predictions_p2_test.csv",
+                       parse_dates=["order_purchase_timestamp"])
+    flags = pd.read_csv(RESULTS / "review_timing_test_orders.csv")
+    check("the timing flags cover exactly the held-out review predictions",
+          len(flags) == len(pred) and set(flags["order_id"]) == set(pred["order_id"]),
+          f"{len(flags):,} flags, {len(pred):,} predictions")
+    m = pred.merge(flags, on="order_id")
+    flagged = m["p_low_review"] >= 0.11
+    reach = flagged & (m["actual_low_review"] == 1) & (m["written_before_arrival"] == 0)
+    c = config.COSTS
+    net = 1000 * (reach.sum() * c["low_review_cost"] - flagged.sum() * c["outreach_cost"]) / len(m)
+    val = pd.read_csv(RESULTS / "review_timing_value.csv")
+    at = val.loc[val["threshold"].round(2) == 0.11, "net_reachable_per_1k"].iloc[0]
+    check("the reachable-only value recomputes from the per-order predictions and flags",
+          abs(net - at) < 1e-6, f"R${net:,.0f} per 1,000 delivered orders")
+    story = pd.read_csv(RESULTS / "story_order.csv").iloc[0]
+    oid = story["order_id"]
+    day = m[m["order_purchase_timestamp"].dt.date == pd.Timestamp("2018-07-16").date()]
+    first = day.sort_values("p_low_review", ascending=False, kind="stable").iloc[0]["order_id"]
+    delivered = pd.to_datetime(TABLES["orders"].set_index("order_id").loc[oid, "order_delivered_customer_date"])
+    reviews = TABLES["order_reviews"]
+    answered = pd.to_datetime(reviews.loc[reviews["order_id"] == oid, "review_answer_timestamp"]).max()
+    check("the presentation's order tops the 16 July list and was reviewed before it arrived",
+          first == oid and answered < delivered,
+          f"answered {answered:%d %b %Y}, delivered {delivered:%d %b %Y}")
+except FileNotFoundError as exc:
+    check("review-timing tables exist (run src/review_timing.py)", False, str(exc))
+
+
+# ===========================================================================
 print()
 if FAILURES:
     print(f"{len(FAILURES)} CHECK(S) FAILED:")

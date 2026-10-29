@@ -170,6 +170,62 @@ for k in be.index:
             S[f"pilot_k{k}_{t}_net_per_contact"] = r(part.loc[rr, "net_benefit_per_contact"], 2)
 
 # ===========================================================================
+# 19. When is the review written? (src/review_timing.py, Appendix "timing")
+# ===========================================================================
+tim = need("review_timing.csv").set_index("group")
+for g, key in [("all", "all"), ("late", "late"), ("on time", "ontime"),
+               ("low review, late", "low_late"), ("low review, on time", "low_ontime")]:
+    S[f"tim_{key}_n"] = int(tim.loc[g, "n"])
+    S[f"tim_{key}_written_before_pct"] = r(tim.loc[g, "pct_written_before_arrival"], 1)
+    S[f"tim_{key}_survey_on_after_promise_pct"] = r(tim.loc[g, "pct_survey_on_or_after_promise"], 1)
+    S[f"tim_{key}_median_answer_days_after_delivery"] = r(tim.loc[g, "median_answer_days_after_delivery"], 1)
+    S[f"tim_{key}_low_pct"] = r(tim.loc[g, "pct_low_review"], 1)
+for g, key in [("low review, late", "low_late"), ("low review, on time", "low_ontime")]:
+    S[f"tim_{key}_share_of_low_pct"] = r(tim.loc[g, "share_of_all_low_reviews_pct"], 1)
+for _, row in need("review_timing_lateness.csv").iterrows():
+    S[f"tim_bucket_{slug(row['bucket'])}_low_pct"] = r(row["low_pct"], 1)
+tcap = need("review_timing_capacity.csv")
+for _, row in tcap.iterrows():
+    k = str(row["k"]).replace("%", "pct").replace(" a day", "_daily").replace(".", "p")
+    S[f"tim_cap_{k}_precision"] = r(row["precision"])
+    S[f"tim_cap_{k}_reachable"] = r(row["reachable_precision"])
+    S[f"tim_cap_{k}_written"] = r(row["already_written_precision"])
+    S[f"tim_cap_{k}_late_share"] = r(row["late_share"])
+S["tim_random_precision"] = r(tcap["base_rate"].iloc[0])
+S["tim_random_reachable"] = r(tcap["reachable_base_rate"].iloc[0])
+tval = need("review_timing_value.csv")
+best_all = tval.loc[tval["net_all_per_1k"].idxmax()]
+best_reach = tval.loc[tval["net_reachable_per_1k"].idxmax()]
+S["tim_value_all_per_1k"] = int(round(best_all["net_all_per_1k"]))
+S["tim_value_all_threshold"] = r(best_all["threshold"], 2)
+S["tim_value_reachable_per_1k"] = int(round(best_reach["net_reachable_per_1k"]))
+S["tim_value_reachable_threshold"] = r(best_reach["threshold"], 2)
+ten = tcap[(tcap["kind"] == "daily") & (tcap["k"] == "10 a day")].iloc[0]
+per_1k = 1000 * ten["contacts"] / len(need("review_timing_test_orders.csv"))
+c = config.COSTS
+S["tim_value_ten_all_per_1k"] = int(round(per_1k * (ten["precision"] * c["low_review_cost"] - c["outreach_cost"])))
+S["tim_value_ten_reachable_per_1k"] = int(round(per_1k * (ten["reachable_precision"] * c["low_review_cost"]
+                                                          - c["outreach_cost"])))
+tsub = need("review_timing_subsets.csv").set_index("subset")
+for g, key in [("on time", "ontime"), ("late", "late")]:
+    S[f"tim_sub_{key}_n"] = int(tsub.loc[g, "n"])
+    S[f"tim_sub_{key}_base_rate"] = r(tsub.loc[g, "base_rate"])
+    S[f"tim_sub_{key}_roc"] = r(tsub.loc[g, "roc_auc"])
+    S[f"tim_sub_{key}_prauc"] = r(tsub.loc[g, "pr_auc"])
+    S[f"tim_sub_{key}_top5_precision"] = r(tsub.loc[g, "precision_top5pct"])
+    S[f"tim_sub_{key}_top5_lift"] = r(tsub.loc[g, "lift_top5pct"], 1)
+story = need("story_order.csv").iloc[0]
+S["story_order_id"] = story["order_id"]
+S["story_distance_km"] = int(round(story["distance_km"]))
+S["story_days_late"] = r(story["days_late"], 1)
+S["story_review_days_before_arrival"] = r(story["review_days_before_arrival"], 1)
+S["story_p_late_at_checkout"] = r(story["p_late_at_checkout"], 2)
+S["story_p_low_at_delivery"] = r(story["p_low_review_at_delivery"], 2)
+S["story_orders_on_day"] = int(story["orders_on_day"])
+S["story_top10_low_reviews"] = int(story["top10_low_reviews"])
+S["story_top10_written_before_arrival"] = int(story["top10_written_before_arrival"])
+
+# ===========================================================================
 # 18. Figures and tables the final report draws from
 # ===========================================================================
 S["n_result_tables"] = len(list(RESULTS.glob("*.csv")))

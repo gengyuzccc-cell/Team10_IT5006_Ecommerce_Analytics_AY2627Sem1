@@ -51,6 +51,15 @@ def load_replay() -> tuple[pd.DataFrame, dict]:
     df["day"] = df["order_purchase_timestamp"].dt.date
     df["late_flag"] = (df["p_late"] >= meta["p1b"]["threshold"]).astype("Int64")
     df["low_review_flag"] = (df["p_low_review"] >= meta["p2"]["threshold"]).astype(int)
+    # When was the review written? In the data, a late parcel's survey goes out
+    # once its promised date has passed (99% of late parcels), so its customer
+    # usually reviews while still waiting (src/review_timing.py). Optional: the
+    # tab works without the file.
+    timing = RESULTS / "review_timing_test_orders.csv"
+    if timing.exists():
+        df = df.merge(pd.read_csv(timing), on="order_id", how="left")
+    else:
+        df["written_before_arrival"] = np.nan
     return df, meta
 
 
@@ -123,6 +132,8 @@ def render_replay() -> None:
     precision = hits / k_eff
     recall = hits / positives if positives else np.nan
     mae_day = float((g["pred_days"] - g["actual_days"]).abs().mean())
+    early = int((g["in_top_k"] & (g["actual_low_review"] == 1)
+                 & (g["written_before_arrival"] == 1)).sum())
 
     cards = [
         ("Orders placed that day", f"{len(g):,}",
@@ -134,7 +145,8 @@ def render_replay() -> None:
         cards += [
             ("Hits in the top-K", f"{hits} of {k_eff}",
              f"precision {100 * precision:.0f}% · recall "
-             f"{'—' if np.isnan(recall) else f'{100 * recall:.0f}%'} of {positives} low reviews",
+             f"{'—' if np.isnan(recall) else f'{100 * recall:.0f}%'} of {positives} low reviews"
+             + (f" · {early} written before the parcel arrived" if hits else ""),
              theme.ACCENT),
             ("Lead-time error that day", f"{mae_day:.1f} d",
              f"mean |predicted − actual|; promise off by "
@@ -176,8 +188,12 @@ def render_replay() -> None:
     }
     if reveal:
         show.insert(3, "actual review", np.where(g["actual_low_review"] == 1, "1–2 ★", "3–5 ★"))
-        show.insert(6, "actual days", days(g["actual_days"]))
-        show.insert(7, "delivery", np.select(
+        show.insert(4, "review written", np.select(
+            [g["actual_days"].isna(), g["written_before_arrival"] == 1,
+             g["written_before_arrival"] == 0],
+            ["—", "before the parcel", "after delivery"], default="—"))
+        show.insert(7, "actual days", days(g["actual_days"]))
+        show.insert(8, "delivery", np.select(
             [g["actual_late"] == 1, g["actual_late"] == 0], ["late", "on time"],
             default="not delivered"))
     st.dataframe(show, use_container_width=True, hide_index=True, height=380,
@@ -255,7 +271,10 @@ def render_replay() -> None:
             "been fixed on earlier data, so the app is doing here exactly what it would "
             "do on a live feed: scoring orders it has never seen and ranking them for "
             "action. The review risk shown is the score at delivery, with the realised "
-            "delivery dates, which is the moment the model was built for. For an order "
-            "that has not shipped yet, the <b>Predict</b> tab gives the checkout-time "
-            "view instead."),
+            "delivery dates, which is the moment the model was built for. One caveat the "
+            "<b>review written</b> column makes visible: when a parcel misses its promised "
+            "date, Olist sends the survey once that date has passed, so most customers of late parcels "
+            "review while still waiting. For them a call at delivery comes too late, and "
+            "the moment to act is the promised date. For an order that has not shipped "
+            "yet, the <b>Predict</b> tab gives the checkout-time view instead."),
         unsafe_allow_html=True)
