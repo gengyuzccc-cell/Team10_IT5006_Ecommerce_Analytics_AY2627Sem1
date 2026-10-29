@@ -13,11 +13,11 @@ reminders, mapped to where it is satisfied. **§** refers to the final report.
 | All other corrections/updates asked by evaluators in Phases 1 and 2 | Incorporated throughout; Appendix I (two tables) maps every point to its section; `docs/feedback_responses.md` |
 | Dataset and preprocessing | §3 (+ Appendix B: data model, cleaning decisions, data dictionary) |
 | Problem definition and stakeholder context | §1 (Tables 1 and 2) |
-| Exploratory analysis highlights | §4 (figures in Appendix N) |
+| Exploratory analysis highlights | §4 (figures in Appendix O) |
 | Modelling approaches (classification and regression) | §5 features, §6 methodology (regression 1A; classification 1B and 2; three families reused) |
 | Results and evaluation | §7 (Tables 3–6, fold-to-fold variation, capacity view, error analysis; Appendices G and J) |
 | Model deployment and application | §8 (Table 7, Figures 25–27) |
-| Business recommendations and impact | §9 (cost layer, recommendations by stakeholder, the pilot, impact) |
+| Business recommendations and impact | §9 (cost layer, recommendations by stakeholder, the pilot, impact); when the review is written, and the value on the reachable share, in Appendix M |
 | References | 51 entries, every one verified against the publisher record or DOI |
 | Standalone: complete for a reader who has not seen earlier submissions | Yes — the report re-states the data, EDA, literature and candidates rather than referring to earlier PDFs |
 | 12pt font, single-spaced; figure captions and table labels | `\documentclass[12pt,a4paper]`; every figure and table captioned and numbered, and every one referred to from the text |
@@ -37,7 +37,7 @@ reminders, mapped to where it is satisfied. **§** refers to the final report.
 | API endpoints documented with examples | None exposed; the batch CSV contract (columns, types, example row, output columns) is documented in `deployment/README.md` and the template is downloadable in the app |
 | No hardcoded credentials | None; the app reads only committed files |
 | Test deployment before submission | Local run of both entry points; Playwright capture of every tab (`deployment/capture_screenshots.py`); the deployed URL exercised after each push |
-| Dashboard updated with model outputs; screenshots in the slides | Predict, Replay a day and Model card tabs; `docs/screenshots/`; slides 9–10 |
+| Dashboard updated with model outputs; screenshots in the slides | Predict, Replay a day (with the new *review written* column) and Model card tabs; `docs/screenshots/`; slide 9 (Replay a day, with a button that opens the live app) and backup slide 21 (Predict, Model card) |
 
 ## GitHub repository
 
@@ -57,8 +57,8 @@ reminders, mapped to where it is satisfied. **§** refers to the final report.
 | Requirement | Where |
 |---|---|
 | Professional slides (PowerPoint or PDF), locked by Wed 4 Nov 2026 23:59 | `docs/Team10_Phase3_slides.pptx` and `.pdf` |
-| Screenshots of the deployed application | Slides 9–10 |
-| 10 minutes + 5 minutes Q&A | 13 slides, scripted at ~9½ minutes at a normal pace (`docs/presentation_script.md`) |
+| Screenshots of the deployed application | Slide 9 (Replay a day; the live app opens from the slide) and backup slide 21 (Predict, Model card) |
+| 10 minutes + 5 minutes Q&A | 13 slides told as one story, scripted at 1,252 words (about 9.3 minutes of speech, ending at 9:43 with clicks and handovers); 8 hidden backup slides reached from the question navigator on slide 13; 15 predicted questions answered in `docs/presentation_script.md` |
 | Identical deck in the ZIP | `build_submission.py` copies the same files |
 
 ## Submission format
@@ -82,7 +82,7 @@ reminders, mapped to where it is satisfied. **§** refers to the final report.
 | Target leakage via post-outcome columns | One forbidden set per prediction moment, enforced by `assert_no_leakage` and tested in both directions |
 | Class imbalance; not accuracy alone | PR-AUC against its floor, majority accuracy beside accuracy, balanced accuracy, calibration, Precision@K |
 | Clean, commented code; meaningful names | `src/` modules carry the reasoning for each decision |
-| Error handling and data validation | 56 checks in `tests/test_leakage.py`; row-count assertions on load; typed errors in the app |
+| Error handling and data validation | 60 checks in `tests/test_leakage.py`; row-count assertions on load; typed errors in the app |
 | Separation of preparation, modelling, evaluation, deployment | `data_load.py` / `features.py` → `modeling.py` → `evaluate.py` → `deployment/` |
 | Olist as the only data source; transformations documented | No external data; `CLEANING_DECISIONS`; Appendix B |
 | Reproducibility | Appendix A: the run order that regenerates every artifact, table, figure and number |

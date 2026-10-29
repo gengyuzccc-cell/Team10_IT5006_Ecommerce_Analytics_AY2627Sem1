@@ -27,7 +27,7 @@ real outcomes revealable, and carries a model card. If it is asleep, press
 | Item | Location |
 |---|---|
 | **Final report (Phase 3)** | [`docs/Team10_Phase3_IT5006_AY2627Sem1.pdf`](docs/Team10_Phase3_IT5006_AY2627Sem1.pdf) — standalone: literature, data, EDA, modelling, results, deployment, recommendations; answers both rounds of feedback in Appendix I |
-| **Presentation slides** | [`docs/Team10_Phase3_slides.pptx`](docs/Team10_Phase3_slides.pptx) · [`docs/Team10_Phase3_slides.pdf`](docs/Team10_Phase3_slides.pdf) — the 10-minute deck, with speaker notes |
+| **Presentation slides** | [`docs/Team10_Phase3_slides.pptx`](docs/Team10_Phase3_slides.pptx) · [`docs/Team10_Phase3_slides.pdf`](docs/Team10_Phase3_slides.pdf) — the 10-minute story deck (13 slides + 8 hidden backup slides for questions), with Morph transitions, clickable navigation and speaker notes; present from the PPTX. Script, demo path and predicted questions: [`docs/presentation_script.md`](docs/presentation_script.md) |
 | Earlier reports | [`report/Team10_Phase1_IT5006_AY2627Sem1.pdf`](report/Team10_Phase1_IT5006_AY2627Sem1.pdf), [`report/Team10_Phase2_IT5006_AY2627Sem1.pdf`](report/Team10_Phase2_IT5006_AY2627Sem1.pdf) — kept as submitted, with the corrections noted on their covers |
 | LaTeX sources | [`report/*.tex`](report/), [`report/sections/`](report/sections/), [`report/refs.bib`](report/refs.bib) — the folder uploads to Overleaf and compiles as-is |
 | Notebooks | [`notebooks/`](notebooks/) — ten, executed with outputs (01–04 exploration, 05–09 modelling, 10 the Phase 3 additions) |
@@ -46,7 +46,7 @@ python -m venv .venv && .venv/Scripts/activate && pip install -r requirements-de
 ```
 
 ```bash
-python tests/test_leakage.py     # 56 validation checks
+python tests/test_leakage.py     # 60 validation checks
 streamlit run deployment/app.py  # the application (dashboard/app.py is the Cloud entry point)
 ```
 
@@ -59,6 +59,7 @@ python src/lateness_anatomy.py   # weekly / monthly / strike-cohort lateness tab
 python src/fit_diagnostics.py    # deployed models scored on train / validation / test (no refit)
 python src/selection_tables.py   # every candidate on every CV window, fold-to-fold spread, selected hyperparameters
 python src/pilot_design.py       # sizing of the outreach pilot
+python src/review_timing.py      # when the review is written vs the delivery; reachable share; replay flags
 python src/figures_phase2.py     # draws every modelling figure (vector PDF)
 python src/phase3_stats.py       # regenerates every number quoted in the final report
 python src/report_stats.py       # regenerates every exploratory number (unchanged since Phase 1)
@@ -99,6 +100,7 @@ ever drifts.
 │   ├── fit_diagnostics.py              deployed models on train / validation / test
 │   ├── selection_tables.py             CV folds per candidate; selected hyperparameters
 │   ├── pilot_design.py                 the outreach pilot: break-even and sample size
+│   ├── review_timing.py                review written before or after the parcel arrived
 │   ├── figures_phase2.py               every modelling figure, drawn from the tables
 │   ├── phase3_stats.py                 regenerates every number in the final report
 │   ├── phase2_stats.py / report_stats.py   the Phase 2 and Phase 1 contracts, unchanged
@@ -112,7 +114,7 @@ ever drifts.
 │   └── README.md                       usage, CSV contract, deployment and troubleshooting
 ├── dashboard/app.py                    Community Cloud entry point: runs deployment/app.py
 ├── models/                             fitted estimators + metadata + history lookup
-├── tests/test_leakage.py               56 validation checks
+├── tests/test_leakage.py               60 validation checks
 ├── report/
 │   ├── *.tex, sections/, refs.bib      Overleaf-ready sources for all three reports
 │   ├── results/                        every result table, as CSV
@@ -172,11 +174,22 @@ selection ranks models within windows rather than averaging across them.
 **Capacity view.** Contacting the riskiest 5% of deliveries reaches a would-be
 1–2 star reviewer 68% of the time and covers 31% of all such reviews; at ten
 contacts a day, 57% and 25%. Under illustrative costs of R$5 per contact and
-R$40 per low review the policy is worth about R$1,466 per 1,000 delivered orders
+R$40 per low review the policy is worth up to R$1,466 per 1,000 delivered orders
 — *if* a contact prevents the review it reaches, which the data cannot show.
 `src/pilot_design.py` sizes the randomised pilot that would test it: about six
 weeks at ten contacts a day to detect a one-in-four reduction, break-even at
 roughly one in five.
+
+**When the review is written.** Olist's review table records when the survey was
+sent and when it was answered. For a late parcel the survey goes out once the
+promised date passes, and **87% of its 1–2 star reviews are written before the
+parcel arrives** (a median 4.5 days before); on-time parcels, which produce two
+thirds of all low reviews, are reviewed about two days after delivery. So of the
+57 hits per 100 calls at ten a day, 35 can still be reached and 22 have already
+written; counting only the reachable, the value is **R$775** per 1,000 delivered
+orders (R$433 at ten calls a day). Late parcels are better handled on the
+promised date — an apology, a new date, and the survey sent after arrival —
+which is the second arm of the pilot (`src/review_timing.py`; report Appendix M).
 
 ## What we found about method
 
