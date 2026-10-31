@@ -39,7 +39,7 @@ precision is what decides whether a flag is worth acting on at all.}
 \textbf{break-even} & \textbf{best achieved} & \textbf{verdict} \\
 \midrule
 Low-review risk, at delivery & R\$5 : R\$40  & 0.125 & 0.37 at the optimum & \best{act} \\
-Late-order flag, at checkout & R\$12 : R\$40 & 0.300 & 0.29 at any volume & do not expedite \\
+Late-order flag, at checkout & R\$12 : R\$40 & 0.300 & 0.28 at best & do not expedite \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -49,7 +49,7 @@ going to complain costs perhaps R\$5 of agent time; a 1--2 star review that coul
 have been headed off costs perhaps R\$40 --- standing in for the damage
 \citet{deshpande2023logistics} trace through to seller sales. Break-even
 precision is 0.125 and the model reaches 0.369 at its expected-benefit optimum,
-flagging 1{,}927 of 12{,}855 delivered orders (15.0\%) of which 712 do go on to
+flagging 1{,}927 of 12{,}855 reviewed orders (15.0\%) of which 712 do go on to
 leave a low review, for a net \textbf{R\$1{,}466 per 1{,}000 delivered orders}
 (R\$775 counting only customers who have not yet written, Appendix~\ref{app:timing};
 Figure~\ref{fig:threshold}); the margin is wide enough to survive a wrong cost
@@ -62,7 +62,7 @@ precision is, so the list is simply worked top-down until the agents run out.
 more useful finding, and reporting discrimination alone would have missed it.
 Expediting freight costs perhaps R\$12 against the same R\$40 of downstream
 damage, so break-even precision is 0.300 --- and the derived flag never reaches
-it: precision plateaus at \textbf{0.29} and falls as volume rises. A model with
+it: precision peaks at \textbf{0.28} and falls as volume rises. A model with
 ROC-AUC 0.782 and 2.9$\times$ the no-skill floor is genuinely informative and
 still not worth paying R\$12 an order to act on. That changes \emph{which} action
 it justifies rather than making it useless: break-even falls with the cost of the

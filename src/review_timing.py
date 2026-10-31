@@ -28,9 +28,12 @@ the ones train_models.py wrote.
     review_timing_test_orders.csv  one row per held-out test order: was its
                                  review written before the parcel arrived? Read
                                  by the dashboard's Replay tab
-    review_timing_subsets.csv    the review-risk score on all, on-time and late
-                                 test parcels separately (does it only restate
-                                 lateness?)
+    review_timing_subsets.csv    the review-risk score on all, delivered, on-time,
+                                 late and never-delivered test orders separately
+                                 (does it only restate lateness?)
+    review_timing_composition.csv  where the daily top-ten hits come from (never
+                                 delivered / late, written before arrival / still
+                                 reachable), and the same list on delivered orders
 """
 from __future__ import annotations
 
@@ -137,6 +140,32 @@ def capacity_split(p: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def hit_composition(p: pd.DataFrame, k: int = 10) -> pd.DataFrame:
+    """Where the hits of the daily top-k list come from, and the same list on delivered orders.
+
+    A delivery-day call can reach only a delivered parcel whose review is not yet
+    written; orders that never arrived, and late parcels reviewed while waiting, are
+    the case for the promised-date contact instead.
+    """
+    q = p.copy()
+    q["day"] = q["order_purchase_timestamp"].dt.date
+    rows = []
+    for name, frame in [("all reviewed orders", q), ("delivered orders only", q[q["delivered"]])]:
+        ranked = frame.sort_values(["day", "p_low_review"], ascending=[True, False], kind="stable")
+        top = ranked[ranked.groupby("day").cumcount() < k]
+        hit = top[top["low"]]
+        n = len(top)
+        rows.append({"list": name, "k_per_day": k, "orders": len(frame), "base_rate": frame["low"].mean(),
+                     "contacts": n, "hits": len(hit), "precision": len(hit) / n,
+                     "never_delivered_per_100": 100 * (~hit["delivered"]).sum() / n,
+                     "late_written_before_per_100": 100 * (hit["delivered"] & hit["late"] & hit["written_before_arrival"]).sum() / n,
+                     "delivered_reachable_per_100": 100 * (hit["delivered"] & ~hit["written_before_arrival"]).sum() / n,
+                     "ontime_written_before_per_100": 100 * (hit["delivered"] & ~hit["late"] & hit["written_before_arrival"]).sum() / n,
+                     "contacts_never_delivered_pct": 100 * (~top["delivered"]).mean(),
+                     "story_day_hits": int(hit[hit["day"] == STORY_DAY].shape[0])})
+    return pd.DataFrame(rows)
+
+
 def value_table(p: pd.DataFrame, c_action: float, c_miss: float) -> pd.DataFrame:
     """Net benefit by threshold, counting all hits and counting reachable hits only."""
     rows = []
@@ -202,6 +231,11 @@ if __name__ == "__main__":
     p = p.join(flags, on="order_id")
     p["written_before_arrival"] = p["written_before_arrival"].fillna(False).astype(bool)
     p["late"] = p["late"].fillna(False).astype(bool)
+    # Reviewed orders that never arrived (cancelled, or still "shipped" when the
+    # extract was taken) carry no delivery fields; keep them visible throughout.
+    orders = tables["orders"]
+    delivered_ids = set(orders.loc[orders["order_delivered_customer_date"].notna(), "order_id"])
+    p["delivered"] = p["order_id"].isin(delivered_ids)
     p["low"] = p["actual_low_review"] == 1
     p["reachable"] = p["low"] & ~p["written_before_arrival"]
 
@@ -218,7 +252,9 @@ if __name__ == "__main__":
     # Is the review score only restating lateness? Rank the on-time parcels alone.
     from sklearn.metrics import average_precision_score, roc_auc_score
     rows = []
-    for name, g in [("all", p), ("on time", p[~p["late"]]), ("late", p[p["late"]])]:
+    for name, g in [("all", p), ("delivered", p[p["delivered"]]),
+                    ("on time", p[p["delivered"] & ~p["late"]]), ("late", p[p["late"]]),
+                    ("never delivered", p[~p["delivered"]])]:
         top = g.sort_values("p_low_review", ascending=False, kind="stable").head(max(1, int(round(0.05 * len(g)))))
         rows.append({"subset": name, "n": len(g), "base_rate": g["low"].mean(),
                      "roc_auc": roc_auc_score(g["low"], g["p_low_review"]),
@@ -228,6 +264,10 @@ if __name__ == "__main__":
     subsets = pd.DataFrame(rows)
     subsets.to_csv(RESULTS / "review_timing_subsets.csv", index=False)
     print(subsets.round(3).to_string(index=False))
+
+    composition = hit_composition(p)
+    composition.to_csv(RESULTS / "review_timing_composition.csv", index=False)
+    print(composition.round(3).to_string(index=False))
 
     # Daily ten-a-day list, per 1,000 delivered orders, all hits against reachable hits.
     c = config.COSTS

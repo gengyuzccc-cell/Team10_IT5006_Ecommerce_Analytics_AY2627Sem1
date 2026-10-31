@@ -9,7 +9,7 @@ and the other eight attach to it directly or through \code{order\_items}
 (Figure~\ref{fig:datamodel}; Table~\ref{tab:dictionary} in
 Appendix~\ref{app:dictionary} is the full data dictionary). Three tables are
 \textbf{one-to-many} against orders, and joining them naively is the first trap
-the data sets: a direct orders--items--payments merge yields 118{,}437 rows
+the data sets: a direct orders--items--payments merge yields 118{,}434 rows
 rather than 99{,}441, a 19\% inflation that silently reweights every mean
 towards large baskets. Each child table is therefore aggregated to one row per
 order --- counts, sums and the attributes of the most expensive item --- and

@@ -27,7 +27,7 @@ real outcomes revealable, and carries a model card. If it is asleep, press
 | Item | Location |
 |---|---|
 | **Final report (Phase 3)** | [`docs/Team10_Phase3_IT5006_AY2627Sem1.pdf`](docs/Team10_Phase3_IT5006_AY2627Sem1.pdf) — standalone: literature, data, EDA, modelling, results, deployment, recommendations; answers both rounds of feedback in Appendix I |
-| **Presentation slides** | [`docs/Team10_Phase3_slides.pptx`](docs/Team10_Phase3_slides.pptx) · [`docs/Team10_Phase3_slides.pdf`](docs/Team10_Phase3_slides.pdf) — the 10-minute story deck (13 slides + 8 hidden backup slides for questions), with Morph transitions, clickable navigation and speaker notes; present from the PPTX. Script, demo path and predicted questions: [`docs/presentation_script.md`](docs/presentation_script.md) |
+| **Presentation slides** | [`docs/Team10_Phase3_slides.pptx`](docs/Team10_Phase3_slides.pptx) · [`docs/Team10_Phase3_slides.pdf`](docs/Team10_Phase3_slides.pdf) — the 10-minute story deck (13 slides) with clickable chapter navigation, timed speaker notes and links and QR codes to the live app; present from the PPTX. Script, demo path and predicted questions: [`docs/presentation_script.md`](docs/presentation_script.md) |
 | Earlier reports | [`report/Team10_Phase1_IT5006_AY2627Sem1.pdf`](report/Team10_Phase1_IT5006_AY2627Sem1.pdf), [`report/Team10_Phase2_IT5006_AY2627Sem1.pdf`](report/Team10_Phase2_IT5006_AY2627Sem1.pdf) — kept as submitted, with the corrections noted on their covers |
 | LaTeX sources | [`report/*.tex`](report/), [`report/sections/`](report/sections/), [`report/refs.bib`](report/refs.bib) — the folder uploads to Overleaf and compiles as-is |
 | Notebooks | [`notebooks/`](notebooks/) — ten, executed with outputs (01–04 exploration, 05–09 modelling, 10 the Phase 3 additions) |
@@ -167,8 +167,8 @@ would need, so the recommendation is to re-quote and pre-warn, not to expedite.
 **Problem 2 — low review at delivery.** ROC-AUC 0.749, PR-AUC 0.414 (3.75× the
 0.110 floor), balanced accuracy 0.681, identical on 12,617 customers never seen
 in training. Every candidate's score on every CV window, with the fold-to-fold
-spread, is in `report/results/cv_folds.csv` (and on the model card): the three
-tree-based rungs are within 0.0004 of one another against a spread of ±0.09, so
+spread, is in `report/results/cv_folds.csv` (and on the model card): the forest,
+the boosted model and the stack are within 0.0004 of one another against a spread of ±0.09, so
 selection ranks models within windows rather than averaging across them.
 
 **Capacity view.** Contacting the riskiest 5% of deliveries reaches a would-be
@@ -185,9 +185,10 @@ sent and when it was answered. For a late parcel the survey goes out once the
 promised date passes, and **87% of its 1–2 star reviews are written before the
 parcel arrives** (a median 4.5 days before); on-time parcels, which produce two
 thirds of all low reviews, are reviewed about two days after delivery. So of the
-57 hits per 100 calls at ten a day, 35 can still be reached and 22 have already
-written; counting only the reachable, the value is **R$775** per 1,000 delivered
-orders (R$433 at ten calls a day). Late parcels are better handled on the
+57 hits per 100 calls at ten a day, 22 have already written and 35 have not (26 of
+those 35 are orders that never arrived, which the promised-date contact reaches,
+and 9 are delivered parcels); counting the 35, the value is **R$775** per 1,000
+delivered orders (R$433 at ten calls a day). Late parcels are better handled on the
 promised date — an apology, a new date, and the survey sent after arrival —
 which is the second arm of the pilot (`src/review_timing.py`; report Appendix M).
 

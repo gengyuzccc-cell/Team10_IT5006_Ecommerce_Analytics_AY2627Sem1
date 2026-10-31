@@ -60,7 +60,7 @@ estimator, every randomised search and every subsample. Both requirements files
 pin exact versions on Python $\le$ 3.12, the
 interpreter every reported number was produced on. Model artifacts record the
 \code{scikit-learn} version that wrote them and \code{modeling.load\_model()}
-checks it on the way back in. The nine notebooks (01--04 exploratory, 05--09
+checks it on the way back in. The ten notebooks (01--04 exploratory, 05--09
 modelling, 10 the additions of this phase) are committed with their outputs.
 
 \section{Data model, cleaning decisions and dictionary}
@@ -117,7 +117,7 @@ row per order \emph{before} joining; merging them directly inflates the table by
 \midrule
 One-to-many joins &
 112{,}650 items and 103{,}886 payments against 99{,}441 orders; a naive merge
-yields 118{,}437 rows &
+yields 118{,}434 rows &
 Aggregate each child table to one row per order, then join; assert the grain \\[3pt]
 Customer key &
 99{,}441 \code{customer\_id} values but 96{,}096 \code{customer\_unique\_id};
@@ -138,7 +138,7 @@ Sparse review text &
 \code{review\_comment\_message} for 41.3\% &
 Use \code{review\_score} only; coverage does not support NLP features \\[3pt]
 Geolocation grain &
-1{,}000{,}163 rows for 19{,}010 zip prefixes, including points outside Brazil &
+1{,}000{,}163 rows for 19{,}015 zip prefixes, 42 of them outside Brazil (19{,}010 kept) &
 Collapse to a median coordinate per prefix; use it for great-circle distance \\[3pt]
 Missing product attributes &
 610 products (1.9\%) have no category &
@@ -532,8 +532,8 @@ LogisticRegression     & 0.307 & 0.416 & 0.534 & 0.574 & 0.497 & 0.320 & 0.465 $
 Table~\ref{tab:cvfolds} is what the Phase 2 evaluation asked for. Read down a
 column, the windows differ far more than the models: every candidate is at its
 worst on the first fold (early 2017, few orders, a 20\% low-review rate) and at
-its best on the fourth. Read across a row, the three tree-based rungs are within
-0.0004 of one another on the cross-validated mean against a fold-to-fold
+its best on the fourth. Read across a row, the forest, the boosted model and the
+stack are within 0.0004 of one another on the cross-validated mean against a fold-to-fold
 standard deviation of 0.09; the stacked ensemble is ahead of the single boosted
 model on three of the six windows and behind on three. Cross-validation cannot
 order them, which is why the rank rule was fixed before any test score was seen
@@ -595,7 +595,7 @@ handoff to the doorstep; the promise is the window quoted at checkout.}
 Bought 1--20 May, delivered before the strike & 2{,}749 & 0.4\%  & 4.8  & 19.5 \\
 In transit during the strike                  & 4{,}228 & 16.9\% & 13.1 & 25.5 \\
 Bought during the strike, 21 May--1 June      & 1{,}502 & 3.5\%  & 9.2  & 29.4 \\
-Bought 2--30 June                             & 5{,}912 & 1.4\%  & 6.7  & 27.5 \\
+Bought 2--30 June                             & 5{,}912 & 1.4\%  & 6.6  & 27.5 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -758,7 +758,7 @@ to 2.9$\times$ only because the floor itself moves with the late rate.
 tree ensemble}: ROC-AUC 0.84 on the period it was fitted to against 0.76 and
 0.75 on the two it never saw, and PR-AUC 0.62 against 0.41 --- but validation
 and test agree with each other (lift 3.6$\times$ and 3.75$\times$, Brier
-improving from 0.089 to 0.078 as the base rate falls), which is the comparison
+improving from 0.083 to 0.078 as the base rate falls), which is the comparison
 that governs deployment.
 
 \section{Feature catalogue}
@@ -939,17 +939,37 @@ the parcel arrives. That contact needs no model, since the calendar identifies
 the parcels, and it is tested as the second arm of the pilot
 (Section~\ref{sec:pilot}). The review-risk list keeps its value for the parcels
 that arrive on time, which produce two thirds of all low reviews and are reviewed
-a median 2.1 days after delivery. On those parcels alone the deployed model
-reaches ROC-AUC 0.711, and its top 5\% are 53.8\% low reviewers, 5.7 times their
-base rate, so the list does more than restate lateness
+a median 2.1 days after delivery. On those parcels alone --- delivered on time,
+11{,}654 orders at a 7.9\% base rate --- the deployed model still ranks usefully,
+if less sharply: ROC-AUC 0.651, and its top 5\% are 28.0\% low reviewers, 3.5
+times their base rate; on all delivered parcels (12{,}571, base rate 9.6\%) the
+top 5\% are 53.9\% low reviewers, 5.6 times the base rate
 (\code{review\_timing\_subsets.csv}).
+
+\paragraph{Orders that never arrived.} The Problem~2 population is every reviewed
+test order, and 284 of the 12{,}855 (2.2\%) were never delivered within the
+extract: 122 cancelled, 98 still \emph{shipped}, 36 invoiced, 24 unavailable and
+4 other. Their delivery fields are missing, which the model reads as a strong
+signal --- 73.2\% of them left a 1--2 star review --- and they make up 37\% of
+the daily top-ten picks. Of the 57 hits per 100 calls at ten a day, 26 are such
+orders, 22 are late parcels whose review was written before arrival, and 9 are
+delivered parcels whose customer had not yet written
+(\code{review\_timing\_composition.csv}). A delivery-day call cannot reach the
+first two groups; they are the case for the promised-date contact of
+Section~\ref{sec:stakeholders}, which an order that misses its date triggers
+whether or not it ever arrives. Restricted to delivered parcels, the daily
+top-ten list reaches a would-be low reviewer 45 times per 100 calls (29 already
+written, 16 still reachable) against a 9.6\% base rate, and on 16 July it finds
+six of its ten. Table~\ref{tab:timing-capacity} and the values above count the
+never-delivered hits as reachable; they should be read with that in mind.
 
 The order that opens the presentation shows the pattern in one case. Bought on 16
 July 2018 in São Gonçalo (RJ) from a seller in São Luís (MA), 2{,}267\,km away,
 and promised in 21 days, it was surveyed two days after the promise passed and
 rated one star 5.8 days before it arrived, 10.5 days late. It tops the 16 July
-review-risk list at 0.85; eight of that day's top ten left a 1--2 star review,
-four of them before their parcel arrived (\code{story\_order.csv}).
+review-risk list at 0.85; eight of that day's top ten left a 1--2 star review:
+four wrote before their late parcel arrived, and four never received it
+(\code{story\_order.csv}).
 
 \section{Contributions}
 \label{app:contributions}

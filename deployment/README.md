@@ -34,7 +34,8 @@ src/train_models.py` refits everything if you want to.
 
 1. **Overview · Delivery · Geography · Satisfaction · Data quality** — the
    exploratory analysis. The sidebar filters (purchase month, customer region,
-   category, delivered-only) apply to these five tabs.
+   category, delivered-only) apply to the first four of these tabs; *Data quality*
+   describes the raw tables and is not filtered.
 2. **Predict** — enter one order as it looks at checkout and press *Predict*.
    You get the expected lead time (±3.9 days typical error), the risk of missing
    the promised date against the tuned 11 % threshold, and — conditional on that
@@ -43,8 +44,8 @@ src/train_models.py` refits everything if you want to.
    back with the three predictions appended and a **triage list**: rows ranked by
    review risk with the top-K marked for the capacity you enter, and the precision
    and recall that capacity achieved on the held-out window beside it.
-3. **Replay a day** — pick a purchase day in the held-out test window (1 July –
-   31 August 2018) and a daily capacity K. The tab shows what the deployed models
+3. **Replay a day** — pick a purchase day in the held-out test window (30 June –
+   30 August 2018, its 62 purchase days) and a daily capacity K. The tab shows what the deployed models
    predicted for every order placed that day, ranked, and — with *Reveal what
    actually happened* on — which of them really left a 1–2 star review and how
    long delivery really took. This is the brief's "held-out historical records
@@ -81,11 +82,14 @@ Up to 5,000 rows per upload. The response is the same file with
 Every failure a visitor can cause produces a specific message rather than a
 traceback: a promised date before the purchase date, a non-positive price,
 negative freight, more sellers than items, an empty or malformed CSV, a missing
-column, an oversized file, an unknown category or state (scored through the
-encoder's rare-level bucket), missing model artifacts, and a scikit-learn version
+column, an oversized file, an unknown category (scored through the encoder's
+rare-level bucket), an unknown state code (the row is refused), missing model artifacts, and a scikit-learn version
 that differs from the one the models were pickled with (a visible warning, not a
 silent mismatch). The data loader asserts the row count of all nine source tables
-and stops the app with an explanation if they change.
+and stops the app with an explanation if they change. In a batch upload, state codes
+are normalised (`sp` becomes `SP`), dates and numbers are parsed defensively, and
+rows that the form would refuse are skipped and listed by row number; the
+remaining rows are scored.
 
 ## Deploying on Streamlit Community Cloud
 
@@ -98,8 +102,8 @@ and stops the app with an explanation if they change.
    the build log. `requirements.txt` carries environment markers that select
    wheel-backed versions on 3.13+, but the pinned, tested configuration is 3.12.
 3. Deploy. Every push to `main` redeploys automatically; the models are loaded
-   lazily, so a visitor who only browses the exploratory tabs never pays for
-   unpickling one.
+   once per server process and cached, so no visitor pays for unpickling them
+   twice.
 
 **Staying reachable.** Community Cloud puts an app to sleep after twelve hours
 without traffic and shows a *"Yes, get this app back up!"* button; anyone with the
@@ -112,5 +116,5 @@ app reads only files committed to this repository.
 Everything the model tabs display is read from files that the analysis scripts
 write — `models/model_metadata.json`, `models/*.joblib`, and the tables in
 `report/results/` (`capacity_p2.csv`, `cv_folds.csv`, `hyperparameters.csv`,
-`pilot_design.csv`, `predictions_*_test.csv`). The app recomputes nothing, so a
+`pilot_breakeven.csv`, `predictions_*_test.csv`, `review_timing_test_orders.csv`). The app recomputes nothing, so a
 number on screen is a number in the report.

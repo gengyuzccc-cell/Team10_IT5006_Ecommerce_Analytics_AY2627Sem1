@@ -15,8 +15,8 @@ Three parts, matching the three project phases:
 
 All of it reads the same src/data_load.py and src/features.py the notebooks and
 the reports use, so no figure here can disagree with any PDF. The model tabs
-load their artifacts lazily, so a visitor who only browses the EDA never pays for
-unpickling a model. deployment/README.md documents usage and the CSV contract.
+load their artifacts once per server process and cache them, so no visitor pays
+for unpickling a model twice. deployment/README.md documents usage and the CSV contract.
 """
 from __future__ import annotations
 
@@ -24,8 +24,9 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+for _p in (str(PROJECT_ROOT / "src"), str(Path(__file__).resolve().parent)):
+    if _p not in sys.path:          # Streamlit re-executes this file on every rerun
+        sys.path.insert(0, _p)
 
 import numpy as np
 import pandas as pd
@@ -208,8 +209,14 @@ st.markdown(
 )
 
 if d.empty:
-    st.warning("**No orders match the current filters.** Widen the selection in the sidebar.")
-    st.stop()
+    st.warning("**No orders match the current filters.** The exploratory tabs show all "
+               "orders until the selection is widened; the model tabs are not filtered.")
+    d = DF
+
+
+def _fmt(value, pattern: str) -> str:
+    """Format a statistic, or an em dash when the selection has no value for it."""
+    return pattern.format(value) if pd.notna(value) else "—"
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
     ["Overview", "Delivery", "Geography", "Satisfaction", "Data quality",
@@ -228,9 +235,9 @@ with tab1:
              theme.PRIMARY),
             ("Item revenue", f"R$ {d['total_price'].sum()/1e6:.1f}m",
              f"median R$ {d['total_price'].median():.0f} per order", theme.GOLD),
-            ("Median lead time", f"{d['delivery_days'].median():.1f} d",
+            ("Median lead time", _fmt(d['delivery_days'].median(), "{:.1f} d"),
              "purchase to arrival", theme.GREEN),
-            ("Delivered late", f"{100*d['is_late'].mean():.1f}%",
+            ("Delivered late", _fmt(100*d['is_late'].mean(), "{:.1f}%"),
              "vs the promised date", theme.ACCENT),
         ]),
         unsafe_allow_html=True,
@@ -349,7 +356,7 @@ with tab2:
             "carrier transit lengthened by about three days while the promised "
             "window was tightened by about four. The truckers' strike of 21 May–"
             "1 June 2018 is invisible at monthly resolution — see the weekly chart "
-            "below: orders caught in transit were 16.0% late, and the platform then "
+            "below: orders caught in transit were 16.9% late, and the platform then "
             "lengthened its promise from about 19 to 37 days, which is why June is "
             "the quietest month. None of this is observable at checkout, which is "
             "why an order-level late classifier has a low ceiling."
@@ -469,9 +476,11 @@ with tab3:
         unsafe_allow_html=True,
     )
 
+    # Sample from the rows that survive dropna: a narrowed selection with a few
+    # undelivered orders used to ask for more rows than were left.
+    geo = d.dropna(subset=["distance_km", "delivery_days"])
     fig = px.scatter(
-        d.dropna(subset=["distance_km", "delivery_days"]).sample(
-            min(6000, len(d)), random_state=42),
+        geo.sample(min(6000, len(geo)), random_state=42),
         x="distance_km", y="delivery_days", color="customer_region",
         opacity=0.35, labels={"distance_km": "customer–seller distance (km)",
                               "delivery_days": "lead time (days)",
@@ -592,7 +601,7 @@ with tab5:
             "The two traps",
             "<b>Joins.</b> order_items, order_payments and order_reviews are all "
             "one-to-many against orders. Merging them directly turns 99,441 orders "
-            "into 118,437 rows and biases every average towards large baskets, so "
+            "into 118,434 rows and biases every average towards large baskets, so "
             "each child table is aggregated to one row per order first.<br><br>"
             "<b>Identity.</b> <code>customer_id</code> is regenerated for every "
             "order — 99,441 of them for 96,096 real people. Group on it and you "

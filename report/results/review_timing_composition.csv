@@ -1,0 +1,3 @@
+list,k_per_day,orders,base_rate,contacts,hits,precision,never_delivered_per_100,late_written_before_per_100,delivered_reachable_per_100,ontime_written_before_per_100,contacts_never_delivered_pct,story_day_hits
+all reviewed orders,10,12855,0.1103072734344613,614,351,0.5716612377850163,26.384364820846905,21.98697068403909,8.794788273615636,0.0,36.97068403908795,8
+delivered orders only,10,12571,0.0962532813618646,610,275,0.45081967213114754,0.0,28.852459016393443,16.229508196721312,0.0,0.0,6

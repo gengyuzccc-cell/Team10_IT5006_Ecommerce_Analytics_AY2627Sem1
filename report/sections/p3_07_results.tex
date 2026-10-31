@@ -97,12 +97,12 @@ does the flag need a model of its own? It does not. The derived route reaches
 $\hat{y} - \text{promised}$ is mapped to a probability by a single-parameter
 logistic \citep{platt1999probabilistic} fitted on validation. Even the
 zero-parameter rule --- flag whenever the model expects a miss --- beats every
-fitted classifier.
+fitted classifier on PR-AUC.
 
 \paragraph{The selection protocol got this one wrong, and that is worth reporting.}
 Applied to these seven candidates the rolling-origin rule of Section~\ref{sec:cv}
 ranks a direct classifier first. On every in-training window the candidates sit
-within noise of one another --- in the fifth fold they span 0.206 to 0.362, with
+within noise of one another --- in the fifth fold they span 0.206 to 0.361, with
 the derived route mid-pack --- so the rule separates them on noise; on the
 forward window the gap opens to a factor of 2.3. The later training folds and
 the validation period are dominated by the February--March 2018 carrier
@@ -149,7 +149,7 @@ The selected model reaches \textbf{ROC-AUC 0.749}, \textbf{balanced accuracy
 0.681} and \textbf{PR-AUC 0.414 --- 3.75$\times$ the no-skill floor}. Its raw
 accuracy is 0.901 against a majority-class rule scoring 0.890, which is exactly
 why accuracy is printed but never led with. The tree family beats the linear one
-by 1.43$\times$ on PR-AUC --- but a \emph{single depth-limited decision tree}
+by 1.42$\times$ on PR-AUC --- but a \emph{single depth-limited decision tree}
 already reaches 0.396 of the eventual 0.414, so 96\% of the achievable signal
 comes from one interpretable tree. And the model does not memorise buyers: on the
 12{,}617 test orders from customers never seen in training it scores PR-AUC
@@ -162,8 +162,8 @@ Table~\ref{tab:cvfolds} lists them. The spread is large --- a standard
 deviation of about 0.09 around every mean --- and almost entirely a property of
 the \emph{windows}: the mean over candidates runs from 0.376 on the first fold
 to 0.630 on the fourth, while within any one window the candidates spread by a
-median of 0.045. The three tree-based rungs are inseparable on this evidence
-(CV means of 0.568 apiece; the gap between the best two is under 0.0001), which
+median of 0.045. The forest, the boosted model and the stack are inseparable here
+(CV means of 0.568 apiece, the best two within 0.0001), which
 is the empirical case for the rank-based rule of Section~\ref{sec:cv} and for
 reading the forward columns when the difference is this small. The linear
 family is separated from the trees on every single window, so that conclusion
@@ -222,7 +222,7 @@ Table~\ref{tab:capacity} reads the same test predictions as
 Tables~\ref{tab:late} and \ref{tab:review}, but as a team with limited capacity
 would. Three things follow. \textbf{Capacity, not the threshold, is the binding
 constraint for the review flag.} At a capacity of 5\% of deliveries --- about ten
-contacts a day on this volume of 207 delivered orders a day --- two contacts in
+contacts a day on this volume of 207 reviewed orders a day --- two contacts in
 three reach a customer who would in fact have left a 1--2 star review, 6.1
 times the rate of contacting at random, and those contacts cover 30.7\% of all
 such reviews. Precision stays above the 0.125 break-even at every capacity

@@ -207,13 +207,25 @@ S["tim_value_ten_all_per_1k"] = int(round(per_1k * (ten["precision"] * c["low_re
 S["tim_value_ten_reachable_per_1k"] = int(round(per_1k * (ten["reachable_precision"] * c["low_review_cost"]
                                                           - c["outreach_cost"])))
 tsub = need("review_timing_subsets.csv").set_index("subset")
-for g, key in [("on time", "ontime"), ("late", "late")]:
+for g, key in [("delivered", "delivered"), ("on time", "ontime"), ("late", "late"),
+               ("never delivered", "never_delivered")]:
     S[f"tim_sub_{key}_n"] = int(tsub.loc[g, "n"])
     S[f"tim_sub_{key}_base_rate"] = r(tsub.loc[g, "base_rate"])
     S[f"tim_sub_{key}_roc"] = r(tsub.loc[g, "roc_auc"])
     S[f"tim_sub_{key}_prauc"] = r(tsub.loc[g, "pr_auc"])
     S[f"tim_sub_{key}_top5_precision"] = r(tsub.loc[g, "precision_top5pct"])
     S[f"tim_sub_{key}_top5_lift"] = r(tsub.loc[g, "lift_top5pct"], 1)
+tmix = need("review_timing_composition.csv").set_index("list")
+for g, key in [("all reviewed orders", "all"), ("delivered orders only", "delivered")]:
+    S[f"tim_mix_{key}_orders"] = int(tmix.loc[g, "orders"])
+    S[f"tim_mix_{key}_base_rate"] = r(tmix.loc[g, "base_rate"])
+    S[f"tim_mix_{key}_contacts"] = int(tmix.loc[g, "contacts"])
+    S[f"tim_mix_{key}_hits_per_100"] = r(100 * tmix.loc[g, "precision"], 1)
+    S[f"tim_mix_{key}_never_delivered_per_100"] = r(tmix.loc[g, "never_delivered_per_100"], 1)
+    S[f"tim_mix_{key}_late_written_before_per_100"] = r(tmix.loc[g, "late_written_before_per_100"], 1)
+    S[f"tim_mix_{key}_delivered_reachable_per_100"] = r(tmix.loc[g, "delivered_reachable_per_100"], 1)
+    S[f"tim_mix_{key}_contacts_never_delivered_pct"] = r(tmix.loc[g, "contacts_never_delivered_pct"], 1)
+    S[f"tim_mix_{key}_story_day_hits"] = int(tmix.loc[g, "story_day_hits"])
 story = need("story_order.csv").iloc[0]
 S["story_order_id"] = story["order_id"]
 S["story_distance_km"] = int(round(story["distance_km"]))

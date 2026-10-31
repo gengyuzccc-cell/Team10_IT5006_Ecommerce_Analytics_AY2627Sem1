@@ -49,7 +49,7 @@ cross-validated scores fails because the folds differ enormously in difficulty
 --- lead time runs 12--17 days across the 2017 folds against 8.3 in the test
 window --- so every model's CV error sits about a day above its forward error and
 the \emph{ordering} does not survive: cross-validated MAE ranks Ridge above the
-boosted trees, while every later window and the test period rank them the other
+boosted trees, while the validation and test periods rank them the other
 way round (Figure~\ref{fig:ladder}b). Using the validation period alone fails
 too: two months is short, and these two pull in opposite directions, the late
 rate being 8.2\% in May 2018 and \textbf{1.4\%} in June, the lowest in the

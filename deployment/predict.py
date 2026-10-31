@@ -49,8 +49,8 @@ def load_artifacts() -> dict:
 
     Cached as a resource rather than data: these are unpickled objects shared
     across sessions, and re-reading them per visitor would waste both the time
-    and the memory. Loaded lazily, so a visitor who never opens this tab never
-    pays for scikit-learn touching disk.
+    and the memory. Loaded once per server process, on the first run, and shared
+    by every later visitor.
     """
     import json
 
@@ -302,34 +302,41 @@ def render_predict(df: pd.DataFrame) -> None:
 
         submitted = st.form_submit_button("Predict", type="primary")
 
-    if not submitted:
+    if submitted:
+        row = {
+            "order_purchase_timestamp": pd.Timestamp(purchase),
+            "order_estimated_delivery_date": pd.Timestamp(promised),
+            "customer_state": customer_state, "seller_state": seller_state,
+            "lead_category": category, "lead_payment_type": payment,
+            "n_items": int(n_items), "n_sellers": int(n_sellers),
+            "total_price": float(total_price), "total_freight": float(total_freight),
+            "total_weight_g": float(weight), "max_volume_cm3": float(volume),
+            "total_photos": 3.0, "max_installments": float(installments),
+        }
+        problems = validate(row)
+        if problems:
+            for p in problems:
+                st.error(p)
+            render_batch(df, art)
+            return
+
+        try:
+            frame = assemble(pd.DataFrame([row]), art["lookup"], route_distances(df))
+            result = score(frame, art, at_delivery=True).iloc[0]
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"**Could not score this order:** `{type(exc).__name__}: {exc}`")
+            render_batch(df, art)
+            return
+        # Keep the result across reruns: a sidebar change or a date picked in
+        # another tab must not wipe the numbers a visitor is looking at.
+        st.session_state["last_prediction"] = result
+    elif "last_prediction" in st.session_state:
+        result = st.session_state["last_prediction"]
+        st.caption("Showing the last order scored in this session - press **Predict** "
+                   "to score the form as it stands.")
+    else:
         st.info("Fill the form and press **Predict**. The defaults describe a "
                 "typical São Paulo → Rio order in July 2018.")
-        render_batch(df, art)
-        return
-
-    row = {
-        "order_purchase_timestamp": pd.Timestamp(purchase),
-        "order_estimated_delivery_date": pd.Timestamp(promised),
-        "customer_state": customer_state, "seller_state": seller_state,
-        "lead_category": category, "lead_payment_type": payment,
-        "n_items": int(n_items), "n_sellers": int(n_sellers),
-        "total_price": float(total_price), "total_freight": float(total_freight),
-        "total_weight_g": float(weight), "max_volume_cm3": float(volume),
-        "total_photos": 3.0, "max_installments": float(installments),
-    }
-    problems = validate(row)
-    if problems:
-        for p in problems:
-            st.error(p)
-        render_batch(df, art)
-        return
-
-    try:
-        frame = assemble(pd.DataFrame([row]), art["lookup"], route_distances(df))
-        result = score(frame, art, at_delivery=True).iloc[0]
-    except Exception as exc:  # noqa: BLE001
-        st.error(f"**Could not score this order:** `{type(exc).__name__}: {exc}`")
         render_batch(df, art)
         return
 
@@ -380,6 +387,58 @@ def render_predict(df: pd.DataFrame) -> None:
 # ===========================================================================
 # UI - batch
 # ===========================================================================
+def clean_batch(raw: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    """Normalise a batch upload and drop the rows the single-order form would refuse.
+
+    State codes are stripped and upper-cased, dates and numbers are coerced, so a
+    value that cannot be parsed marks its row instead of raising deep inside the
+    model. Returns the usable rows and one message per problem, with the offending
+    row numbers counted as in the file (the header is line 1).
+    """
+    from config import STATE_REGION
+
+    df = raw.copy()
+    missing_cat = df["lead_category"].isna() | df["lead_payment_type"].isna()
+    for c in ("customer_state", "seller_state", "lead_category", "lead_payment_type"):
+        df[c] = df[c].astype(str).str.strip()
+    for c in ("customer_state", "seller_state"):
+        df[c] = df[c].str.upper()
+    for c in ("n_items", "n_sellers", "total_price", "total_freight", "total_weight_g",
+              "max_volume_cm3", "total_photos", "max_installments"):
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    for c in ("order_purchase_timestamp", "order_estimated_delivery_date"):
+        df[c] = pd.to_datetime(df[c], errors="coerce", format="mixed", dayfirst=True)
+
+    states = list(STATE_REGION)
+    checks = [
+        ("a date that does not parse",
+         df["order_purchase_timestamp"].isna() | df["order_estimated_delivery_date"].isna()),
+        ("promised date not after the purchase date",
+         df["order_estimated_delivery_date"] <= df["order_purchase_timestamp"]),
+        ("unknown state code",
+         ~df["customer_state"].isin(states) | ~df["seller_state"].isin(states)),
+        ("missing category or payment type", missing_cat),
+        ("item total not greater than zero", ~(df["total_price"] > 0)),
+        ("negative or missing freight", ~(df["total_freight"] >= 0)),
+        ("fewer than one item, or more sellers than items",
+         ~(df["n_items"] >= 1) | ~(df["n_sellers"] >= 1) | (df["n_sellers"] > df["n_items"])),
+        ("total weight not greater than zero", ~(df["total_weight_g"] > 0)),
+        ("volume, photos or instalments not a number",
+         df[["max_volume_cm3", "total_photos", "max_installments"]].isna().any(axis=1)),
+    ]
+    bad = pd.Series(False, index=df.index)
+    problems = []
+    for label, mask in checks:
+        mask = mask.fillna(True).astype(bool)
+        if mask.any():
+            rows = [str(i + 2) for i in df.index[mask][:6]]
+            more = ", …" if int(mask.sum()) > 6 else ""
+            plural = "s" if mask.sum() > 1 else ""
+            problems.append(f"{label} (row{plural} {', '.join(rows)}{more})")
+            bad |= mask
+    return df[~bad].reset_index(drop=True), problems
+
+
 def render_batch(df: pd.DataFrame, art: dict) -> None:
     st.markdown("---")
     st.markdown(
@@ -426,6 +485,15 @@ def render_batch(df: pd.DataFrame, art: dict) -> None:
         st.warning(f"File has {len(raw):,} rows; scoring the first "
                    f"{MAX_BATCH_ROWS:,}.")
         raw = raw.head(MAX_BATCH_ROWS)
+
+    raw, problems = clean_batch(raw)
+    if problems:
+        st.warning("**Rows skipped because the form would refuse them:** "
+                   + "; ".join(problems[:8]) + (" …" if len(problems) > 8 else "") + ".")
+    if raw.empty:
+        st.error("**No row in that file can be scored.** Check the dates, the state codes "
+                 "and the numeric columns against the template.")
+        return
 
     try:
         frame = assemble(raw, art["lookup"], route_distances(df))
@@ -644,6 +712,11 @@ def render_model_card() -> None:
             "data was ever contacted. The pilot below is how that would be tested.\n"
             "- **A new seller has no track record.** The history features fall back "
             "to route, then state, then platform, and the model is told so.\n"
+            "- **Some reviewed orders never arrived.** 2.2% of the test orders were "
+            "cancelled or still in transit when the extract was taken; their missing "
+            "delivery fields make them easy to rank, and they are 37% of the daily "
+            "top-ten picks. A delivery-day call cannot reach them - the promised-date "
+            "contact can - and the Replay tab marks them *not delivered*.\n"
             "- **These are decision scores for triage, not entitlements.** They "
             "must not be used to penalise a seller or price a customer.")
 
@@ -723,7 +796,7 @@ def render_model_card() -> None:
                 ("Control-arm rate", f"{100 * p0:.0f}%",
                  f"precision of the top-{k} each day", theme.PRIMARY),
                 ("Orders per arm", f"{int(n):,}",
-                 f"about {weeks} weeks at {k} contacts a day", theme.GOLD),
+                 f"about {weeks} week{'s' if weeks != 1 else ''} at {k} contacts a day", theme.GOLD),
                 ("Net benefit per contact", f"R$ {net:+.2f}",
                  "under R$5 : R$40", theme.GREEN if net > 0 else theme.ACCENT),
                 ("Break-even effect", f"{100 * breakeven:.0f}%",

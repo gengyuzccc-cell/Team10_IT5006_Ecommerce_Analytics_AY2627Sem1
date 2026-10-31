@@ -2,7 +2,7 @@
 
 The brief notes that, because the Olist extract ends in 2018, a deployed app
 predicts on held-out historical records that stand in for new orders. This tab
-makes that literal. The test window - 1 July to 31 August 2018 - was never used
+makes that literal. The test window - 30 June to 30 August 2018, 62 purchase days - was never used
 to fit, tune or threshold anything. The per-order predictions that
 src/train_models.py wrote for it are read back here one purchase day at a time,
 exactly as the deployed models produced them, and ranked the way the
@@ -97,7 +97,7 @@ def render_replay() -> None:
     st.markdown(
         theme.section(
             "Replay a day from the held-out test window",
-            "Pick a purchase day in July–August 2018. The app shows what the deployed "
+            "Pick a purchase day in the held-out window (30 June – 30 August 2018). The app shows what the deployed "
             "models predicted for every order placed that day — orders never used to "
             "fit, tune or threshold anything — ranked the way the customer-experience "
             "team would work them. Reveal the outcomes to check the list against what "
@@ -118,7 +118,7 @@ def render_replay() -> None:
 
     g = df[df["day"] == day].sort_values("p_low_review", ascending=False).reset_index(drop=True)
     if g.empty:
-        st.warning("**No delivered-and-reviewed orders were placed on that day in the "
+        st.warning("**No reviewed orders were placed on that day in the "
                    "test window.** Try a weekday in July or the first half of August; "
                    "orders placed in the last days of August had not been delivered "
                    "when the extract was taken.")
@@ -137,7 +137,7 @@ def render_replay() -> None:
 
     cards = [
         ("Orders placed that day", f"{len(g):,}",
-         "delivered and reviewed, in the test window", theme.PRIMARY),
+         "reviewed test orders (a few were never delivered)", theme.PRIMARY),
         ("Top-K for outreach", f"{k_eff}",
          f"{100 * k_eff / len(g):.1f}% of the day's orders", theme.GOLD),
     ]

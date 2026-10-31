@@ -18,7 +18,7 @@ reminders, mapped to where it is satisfied. **§** refers to the final report.
 | Results and evaluation | §7 (Tables 3–6, fold-to-fold variation, capacity view, error analysis; Appendices G and J) |
 | Model deployment and application | §8 (Table 7, Figures 25–27) |
 | Business recommendations and impact | §9 (cost layer, recommendations by stakeholder, the pilot, impact); when the review is written, and the value on the reachable share, in Appendix M |
-| References | 51 entries, every one verified against the publisher record or DOI |
+| References | 50 entries, every one verified against the publisher record or DOI |
 | Standalone: complete for a reader who has not seen earlier submissions | Yes — the report re-states the data, EDA, literature and candidates rather than referring to earlier PDFs |
 | 12pt font, single-spaced; figure captions and table labels | `\documentclass[12pt,a4paper]`; every figure and table captioned and numbered, and every one referred to from the text |
 | File name `Team10_Phase3_IT5006_AY2627Sem1.pdf` | `docs/Team10_Phase3_IT5006_AY2627Sem1.pdf` (built in `report/`) |
@@ -37,7 +37,7 @@ reminders, mapped to where it is satisfied. **§** refers to the final report.
 | API endpoints documented with examples | None exposed; the batch CSV contract (columns, types, example row, output columns) is documented in `deployment/README.md` and the template is downloadable in the app |
 | No hardcoded credentials | None; the app reads only committed files |
 | Test deployment before submission | Local run of both entry points; Playwright capture of every tab (`deployment/capture_screenshots.py`); the deployed URL exercised after each push |
-| Dashboard updated with model outputs; screenshots in the slides | Predict, Replay a day (with the new *review written* column) and Model card tabs; `docs/screenshots/`; slide 9 (Replay a day, with a button that opens the live app) and backup slide 21 (Predict, Model card) |
+| Dashboard updated with model outputs; screenshots in the slides | Predict, Replay a day (with the new *review written* column) and Model card tabs; `docs/screenshots/`; slide 9 (Replay a day, with a button that opens the live app) |
 
 ## GitHub repository
 
@@ -57,8 +57,8 @@ reminders, mapped to where it is satisfied. **§** refers to the final report.
 | Requirement | Where |
 |---|---|
 | Professional slides (PowerPoint or PDF), locked by Wed 4 Nov 2026 23:59 | `docs/Team10_Phase3_slides.pptx` and `.pdf` |
-| Screenshots of the deployed application | Slide 9 (Replay a day; the live app opens from the slide) and backup slide 21 (Predict, Model card) |
-| 10 minutes + 5 minutes Q&A | 13 slides told as one story, scripted at 1,252 words (about 9.3 minutes of speech, ending at 9:43 with clicks and handovers); 8 hidden backup slides reached from the question navigator on slide 13; 15 predicted questions answered in `docs/presentation_script.md` |
+| Screenshots of the deployed application | Slide 9 (the *Replay a day* tab on 16 July 2018; the live app opens from slides 1, 9 and 13) |
+| 10 minutes + 5 minutes Q&A | 13 slides told as one story; the speaker notes (1,143 words) are timed to 8:00 and are followed by a 2-minute live demo of the app; 15 predicted questions answered in `docs/presentation_script.md` |
 | Identical deck in the ZIP | `build_submission.py` copies the same files |
 
 ## Submission format
