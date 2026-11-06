@@ -1,6 +1,10 @@
 """Model serving for the Olist dashboard - the Phase 2 proof-of-concept.
 
-Two tabs: a single-order scoring form, and a model card.
+Two tabs: a single-order scoring form (with the date the customer would be quoted,
+the batch scorer and the triage list), and a model card (what is deployed, where
+not to trust it, what the recommendations change for customers, the value and
+pilot calculators with both costs as inputs, and where every number on the slides
+comes from).
 
 The point of interest here is that nothing reimplements the training-time
 feature engineering. A form submission is turned back into a one-row order
@@ -94,10 +98,10 @@ def load_capacity() -> pd.DataFrame | None:
 def route_distances(_df: pd.DataFrame) -> tuple[dict, float]:
     """Median customer-seller distance per state pair, for the form to fill in.
 
-    Distance is one of the strongest checkout-time features (r = 0.40 with lead
+    Distance is one of the strongest checkout-time features (r = 0.39 with lead
     time), but it comes from postcode centroids the form does not ask for. The
-    median for the chosen state pair is the honest stand-in, and the overall
-    median covers a pair the data has never seen.
+    median for the chosen state pair is the closest available stand-in, and the
+    overall median covers a pair the data has never seen.
     """
     d = _df.dropna(subset=["distance_km", "lead_seller_state", "customer_state"])
     med = d.groupby(["lead_seller_state", "customer_state"])["distance_km"].median()
@@ -211,10 +215,13 @@ def score(frame: pd.DataFrame, art: dict, at_delivery: bool = False) -> pd.DataF
         # delivery actually went - the at_delivery regime. Here that outcome is
         # the model's own forecast, which is what a pre-arrival triage would
         # have to use; the reported metrics assume the realised values.
+        # is_late follows the forecast delay, as it follows the realised delay in
+        # training (delivered after the promised date), not the 11% warning flag:
+        # the flag would mark an order late while its forecast delay is negative.
         f = frame.copy()
         f["delivery_days"] = out["predicted_days"]
         f["delay_vs_estimate_days"] = out["margin_days"]
-        f["is_late"] = out["late_flag"].astype(float)
+        f["is_late"] = (out["margin_days"] > 0).astype(float)
         out["p_low_review"] = p2["estimator"].predict_proba(f[p2["features"]])[:, 1]
         out["low_review_flag"] = (out["p_low_review"] >= meta["p2"]["threshold"]).astype(int)
     return out
@@ -262,9 +269,9 @@ def render_predict(df: pd.DataFrame) -> None:
     st.markdown(
         theme.section(
             "Score an order",
-            "Enter an order as it would look at checkout. The model returns the "
-            "lead time it expects, the risk of missing the promised date, and - "
-            "under that forecast - the risk of a 1–2 star review."),
+            "Enter an order as it would look at checkout. You get the lead time the "
+            "model expects, the risk of missing the promised date, the date the customer "
+            "would be quoted and, under that forecast, the risk of a 1–2 star review."),
         unsafe_allow_html=True)
 
     states = sorted(df["customer_state"].dropna().unique())
@@ -322,17 +329,19 @@ def render_predict(df: pd.DataFrame) -> None:
 
         try:
             frame = assemble(pd.DataFrame([row]), art["lookup"], route_distances(df))
-            result = score(frame, art, at_delivery=True).iloc[0]
+            result = score(frame, art, at_delivery=True).iloc[0].astype(object)
         except Exception as exc:  # noqa: BLE001
             st.error(f"**Could not score this order:** `{type(exc).__name__}: {exc}`")
             render_batch(df, art)
             return
+        result["purchase"] = row["order_purchase_timestamp"]
+        result["promised_date"] = row["order_estimated_delivery_date"]
         # Keep the result across reruns: a sidebar change or a date picked in
         # another tab must not wipe the numbers a visitor is looking at.
         st.session_state["last_prediction"] = result
     elif "last_prediction" in st.session_state:
         result = st.session_state["last_prediction"]
-        st.caption("Showing the last order scored in this session - press **Predict** "
+        st.caption("Showing the last order scored in this session; press **Predict** "
                    "to score the form as it stands.")
     else:
         st.info("Fill the form and press **Predict**. The defaults describe a "
@@ -343,45 +352,166 @@ def render_predict(df: pd.DataFrame) -> None:
     mae = meta["p1a"]["test_mae"]
     late_thr = meta["p1b"]["threshold"]
     low_thr = meta["p2"]["threshold"]
+    late_line, low_line = f"{100 * late_thr:.0f}%", f"{100 * low_thr:.0f}%"
+    if float(result["predicted_days"]) < 0:
+        # The regression extrapolates below zero far outside its training orders (a
+        # basket of 30 items, say); the number is shown as the model gives it.
+        st.warning(f"**The forecast is below zero ({_dec(result['predicted_days'])} "
+                   "days).** A lead time cannot be negative: this order lies outside the "
+                   "range of the orders the model was fitted on, so read the numbers below "
+                   "as unreliable and check the basket and the dates.")
+    # The sub-labels come from the same comparison as the flags (risk >= threshold),
+    # so a 10.9% risk reads "below the 11% flag line", never "11% not flagged".
     st.markdown(
         theme.kpi_row([
-            ("Predicted lead time", f"{result['predicted_days']:.1f} d",
+            ("Predicted lead time", f"{_dec(result['predicted_days'])} d",
              f"±{mae:.1f} d typical error", theme.PRIMARY),
             ("Promised", f"{result['promised_days']:.0f} d",
-             f"margin {result['margin_days']:+.1f} d", theme.GOLD),
-            ("Risk of missing the promise", f"{100*result['p_late']:.0f}%",
-             "flagged" if result["late_flag"] else "not flagged", theme.ACCENT),
-            ("Risk of a 1–2 star review", f"{100*result['p_low_review']:.0f}%",
-             "flagged" if result["low_review_flag"] else "not flagged", theme.ACCENT),
+             f"margin {_signed(float(result['margin_days']), 1)} d", theme.GOLD),
+            ("Risk of missing the promise", f"{100 * result['p_late']:.1f}%",
+             f"{'at or above' if result['late_flag'] else 'below'} the {late_line} flag line",
+             theme.ACCENT),
+            ("Risk of a 1–2 star review", f"{100 * result['p_low_review']:.1f}%",
+             f"{'at or above' if result['low_review_flag'] else 'below'} the {low_line} flag line",
+             theme.ACCENT),
         ]),
         unsafe_allow_html=True)
 
+    quote = render_quote(result)
+
     # theme.note() emits raw HTML, so this has to be HTML - markdown asterisks
-    # would render literally.
-    verdict = ("<b>Pre-warn the buyer.</b> " if result["late_flag"]
-               else "<b>No action needed.</b> ")
+    # would render literally. The advice is the report's first recommendation: quote
+    # the forecast plus the margin, and then no blanket warning; if the platform keeps
+    # its own date, a warning only for the riskiest tenth of orders, because one at the
+    # 11% line would reach almost half of all customers, most of them on time.
+    p_late = float(result["p_late"])
+    expect = (f"The model expects the parcel {abs(result['margin_days']):.1f} days "
+              f"{'after' if result['margin_days'] > 0 else 'before'} the platform's date "
+              f"(typical error ±{mae:.1f} days). ")
+    if quote is not None:
+        quoted, b = quote
+        lead = (f"<b>Quote {quoted.day} {quoted:%b %Y}</b>, the forecast plus the {b:g}-day "
+                f"margin: with that date no blanket warning is needed. {expect}"
+                "If the platform keeps its own date, ")
+    else:
+        lead = expect + "Against the platform's date, "
+    tenth = late_top_tenth()
+    if tenth is not None:
+        q90, share_late = tenth
+        riskiest = (f"the riskiest tenth of held-out orders (late risk {100 * q90:.1f}% or "
+                    f"more; {100 * share_late:.1f}% of those parcels were late)")
+        advice = (f"this order is in {riskiest}: <b>tell the customer the date may move</b>."
+                  if p_late >= q90 else
+                  f"a warning belongs only on {riskiest}, and this order's "
+                  f"{100 * p_late:.1f}% is below it: <b>no warning</b>.")
+    else:
+        advice = ("<b>tell the customer the date may move</b>." if result["late_flag"]
+                  else "<b>no warning</b>.")
     st.markdown(
         theme.note(
             "What to do with this",
-            verdict
-            + (f"The model expects this parcel to arrive "
-               f"{abs(result['margin_days']):.1f} days "
-               f"{'after' if result['margin_days'] > 0 else 'before'} the promised "
-               f"date, with a typical error of ±{mae:.1f} days. Orders are flagged "
-               f"above a {100*late_thr:.0f}% risk of missing the promise: a "
-               "recall-oriented operating point chosen on the validation period "
-               "for the near-free pre-warning lever, which catches five in six of "
-               "the orders that will miss. Expediting is reserved for the very top "
-               "of the ranked late list, where precision is highest.<br><br>"
+            lead + advice
+            + (f"{warning_reach(late_line)}{expedite_text()}<br><br>"
                f"The review risk shown is conditional on that forecast, so it "
                f"inherits the forecast's error. Once the parcel actually lands, "
-               f"re-score with the realised delivery date - that is the "
+               f"re-score with the realised delivery date: that is the "
                f"at-delivery moment the model was measured at "
-               f"(ROC-AUC {meta['p2']['test_roc_auc']:.2f}, flagging above "
-               f"{100*low_thr:.0f}%).")),
+               f"(ROC-AUC {meta['p2']['test_roc_auc']:.2f}, flagging at or above "
+               f"{low_line}).")),
         unsafe_allow_html=True)
 
     render_batch(df, art)
+
+
+def late_top_tenth() -> tuple[float, float] | None:
+    """The riskiest tenth of delivered held-out orders by late risk: its threshold (the
+    90th percentile of p_late_derived in predictions_p1b_test.csv, as src/customer_view.py
+    defines the list) and the share of those parcels that were late
+    (customer_contact_lists.csv, late_top_decile)."""
+    p1b = load_table("predictions_p1b_test.csv")
+    lists = load_table("customer_contact_lists.csv")
+    if p1b is None or lists is None or "late_top_decile" not in set(lists["list"]):
+        return None
+    share_late = float(lists.set_index("list").loc["late_top_decile", "precision"])
+    return float(p1b["p_late_derived"].quantile(0.9)), share_late
+
+
+def expedite_text() -> str:
+    """Why the late flag is not used to pay for a rush (capacity_p1b.csv, derived route)."""
+    cap = load_table("capacity_p1b.csv")
+    if cap is None:
+        return ""
+    d = cap[cap["route"] == "derived"]
+    return (f" Expediting is not recommended: under the assumed costs a paid rush needs a "
+            f"precision of {float(d['break_even_precision'].iloc[0]):.3f}, and the late "
+            f"flag's ranked list peaks at {float(d['precision_at_k'].max()):.3f}.")
+
+
+def warning_reach(late_line: str = "11%") -> str:
+    """Who a warning at the deployed flag line would reach on the held-out window
+    (customer_outcomes_test.csv)."""
+    out = load_table("customer_outcomes_test.csv")
+    if out is None:
+        return ""
+    o = out.set_index("key")
+    flagged = float(o.loc["prewarn_flagged", "orders"])
+    late_warned = float(o.loc["prewarn_late_flagged", "orders"])
+    late_all = late_warned + float(o.loc["prewarn_late_missed", "orders"])
+    return (f" A warning at the deployed {late_line} flag line would have reached "
+            f"{o.loc['prewarn_flagged', 'per_1000'] / 10:.1f}% of held-out customers, and "
+            f"{100 * (flagged - late_warned) / flagged:.1f}% of their parcels then came on "
+            f"time; it would have warned {100 * late_warned / late_all:.1f}% of the late ones "
+            f"({int(o.loc['prewarn_flagged', 'denominator_n']):,} delivered held-out orders).")
+
+
+def render_quote(result) -> tuple[pd.Timestamp, float] | None:
+    """What the customer would see: the platform's date, and the forecast plus the margin.
+
+    The margin is rule R1 of src/customer_view.py, read from customer_promise_rules.csv,
+    and the date is customer_view.requote(): purchase + forecast + margin, rounded up to
+    the next midnight, a calendar date like the platform's own. Returns the quoted date
+    and the margin, or None when they cannot be computed.
+    """
+    purchase, promised = result.get("purchase"), result.get("promised_date")
+    rules = load_table("customer_promise_rules.csv")
+    if purchase is None or promised is None or rules is None:
+        return None
+    try:
+        from customer_view import requote
+
+        b = float(rules.loc[rules["rule"].str.startswith("R1"), "buffer_days"].iloc[0])
+        test = rules[rules["period"] == "test"].set_index("rule")
+        olist = test.loc["Olist's own promise"]
+        r1 = test[test.index.str.startswith("R1")].iloc[0]
+        quoted = requote(pd.Series([pd.Timestamp(purchase)]),
+                         pd.Series([float(result["predicted_days"])]), b).iloc[0]
+    except Exception as exc:  # noqa: BLE001
+        st.caption(f"Quoted date unavailable: `{type(exc).__name__}: {exc}`")
+        return None
+    promised = pd.Timestamp(promised)
+    shift = int((quoted - promised).days)
+    longer = float(r1["mean_promised_days"] - olist["mean_promised_days"])
+    st.markdown(theme.section("What the customer would see",
+                              "The delivery date shown at checkout: the platform's own, "
+                              "and the one the forecast plus a margin would quote."),
+                unsafe_allow_html=True)
+    st.markdown(theme.kpi_row([
+        ("The platform's date", f"{promised.day} {promised:%b %Y}",
+         f"{float(result['promised_days']):.0f} days after the order, as entered", theme.GOLD),
+        ("Forecast plus the margin", f"{quoted.day} {quoted:%b %Y}",
+         f"forecast {_dec(result['predicted_days'])} d + the {b:g}-day margin, rounded "
+         "up to a calendar day", theme.PRIMARY),
+        ("Difference", (f"{shift:+d}" if shift else "0") + f" day{'s' if abs(shift) != 1 else ''}",
+         "later than the platform's date" if shift > 0 else
+         "earlier than the platform's date" if shift < 0 else "the same date", theme.GREEN),
+    ]), unsafe_allow_html=True)
+    st.caption(
+        f"On the {int(r1['n']):,} delivered held-out orders, dates set this way were missed "
+        f"for {r1['late_pct']:.1f}% of customers against {olist['late_pct']:.1f}% for the "
+        f"platform's date, and were {abs(longer):.1f} days {'longer' if longer > 0 else 'shorter'} "
+        "on average. The margin is the smallest whose broken-promise rate on the validation "
+        "months is no higher than the platform's own (customer_promise_rules.csv).")
+    return quoted, b
 
 
 # ===========================================================================
@@ -505,6 +635,13 @@ def render_batch(df: pd.DataFrame, art: dict) -> None:
 
     scored = pd.concat([raw.reset_index(drop=True),
                         result.reset_index(drop=True).round(4)], axis=1)
+    below_zero = int((scored["predicted_days"] < 0).sum())
+    if below_zero:
+        st.warning(f"**{below_zero} order{'s have' if below_zero > 1 else ' has'} a forecast "
+                   "below zero** (a negative `predicted_days` in the download). A lead time "
+                   "cannot be negative: such an order lies outside the range of the orders "
+                   "the model was fitted on, so check its inputs; the forecast is returned as "
+                   "the model gives it.")
     c1, c2, c3 = st.columns(3)
     c1.metric("Orders scored", f"{len(scored):,}")
     c2.metric("Flagged late", f"{100*result['late_flag'].mean():.1f}%")
@@ -551,13 +688,13 @@ def render_triage(scored: pd.DataFrame) -> None:
         row = cap.iloc[(cap["k_pct"] - share).abs().argmin()]
         st.caption(
             f"Top {k:,} of {n:,} orders = {share:.1f}% of this file. On the held-out "
-            f"test window, acting on the top {row['k_pct']:g}% of deliveries reached a "
-            f"customer who would have left a 1–2 star review "
-            f"{100*row['precision_at_k']:.0f}% of the time (precision@K) and covered "
-            f"{100*row['recall_at_k']:.0f}% of all such reviews (recall@K), "
-            f"{row['lift_at_k']:.1f}× better than contacting at random. The review "
-            f"risk here is conditional on the forecast delivery; in production, "
-            f"re-score at delivery with the realised dates.")
+            f"test window, the top {row['k_pct']:g}% of reviewed test orders by review risk "
+            f"held a customer who went on to leave a 1–2 star review "
+            f"{100*row['precision_at_k']:.0f}% of the time (precision@K; historical "
+            f"outcome), {100*row['recall_at_k']:.0f}% of all such customers (recall@K) "
+            f"and {row['lift_at_k']:.1f}× the rate at random. The review risk here is "
+            f"conditional on the forecast delivery; in operation, re-score at delivery "
+            f"with the realised dates.")
     else:
         st.caption(f"Top {k:,} of {n:,} orders = {share:.1f}% of this file.")
 
@@ -608,7 +745,67 @@ def _artifact(name: str) -> str:
     return f"{name} · {path.stat().st_size / 1e3:.0f} KB" if path.exists() else name
 
 
-def render_model_card() -> None:
+
+# The contacts the model card compares: (list in customer_contact_lists.csv, name,
+# who it reaches). The value table reads their counts from customer_value.csv.
+CONTACTS = [
+    ("promised_date_message", "Promised-date message (no model)",
+     "customers whose promised day ends without a parcel, not yet rated"),
+    ("delivery_day_k10", "Delivery-day call, ten a day",
+     "each day's riskiest deliveries whose customer has not yet rated"),
+    ("slides_ten_a_day", "The slides' list: ten a day by purchase day",
+     "each purchase day's riskiest reviewed orders, scored at delivery"),
+]
+# Pilot arms: the radio label, its rows in customer_pilot_arms.csv, its contact list.
+ARMS = {
+    "Promised-date message (Arm B)": ("arm_b", "promised_date_message"),
+    "Delivery-day call (Arm A)": ("arm_a", "delivery_day_k10"),
+    "Design on slide 11": ("slide_design", "slides_ten_a_day"),
+}
+
+
+def _split_lines(df: pd.DataFrame | None, meta: dict) -> str:
+    """The analysis window and the three periods as orders placed, from first to last
+    purchase day, counted on the order frame with the masks of features.py (train up
+    to config.TRAIN_END, validation to config.VAL_END, test after it). The metadata's
+    cut-offs are instants at midnight, so printing them as dates would put 30 June in
+    both validation and test; without the frame the cut-offs are printed as such."""
+    def span(s: pd.Series, start=None) -> str:
+        a, b = (start if start is not None else s.min()), s.max()
+        return f"{a.day} {a:%b %Y} – {b.day} {b:%b %Y}"
+
+    try:
+        import config
+
+        ts = df["order_purchase_timestamp"]
+        train = ts[ts <= config.TRAIN_END]
+        val = ts[(ts > config.TRAIN_END) & (ts <= config.VAL_END)]
+        test = ts[ts > config.VAL_END]
+        lines = (f"- Orders placed **{span(ts, config.ANALYSIS_START)}** ({len(ts):,})\n"
+                 f"- Train **{span(train, config.ANALYSIS_START)}** ({len(train):,}), "
+                 f"validation **{span(val)}** ({len(val):,}), test **{span(test)}** "
+                 f"({len(test):,}) — scored once, for models already chosen\n")
+    except Exception:  # noqa: BLE001 - no frame: the configured cut-offs
+        return (f"- Window from **{meta['window'][0]}**; train up to "
+                f"**{meta['train_end']} 00:00**, validation up to **{meta['val_end']} 00:00**, "
+                "test after it — scored once, for models already chosen\n"
+                "- Chronological split; a customer-disjoint test subset checks the review "
+                "model on buyers it never saw\n")
+    # The split itself is by time only; customers are kept apart in a test subset
+    # (features.make_splits, report Section 3), not in the test window as a whole.
+    try:
+        from features import make_splits
+
+        n = int(make_splits(df)["n_straddling_customers"])
+        return lines + (f"- Chronological split; a customer-disjoint test subset (the {n} "
+                        "buyers with orders in both train and test left out, on "
+                        "`customer_unique_id`) checks the review model on people it "
+                        "never saw\n")
+    except Exception:  # noqa: BLE001 - the subset is context, not a number the card needs
+        return lines + "- Chronological split\n"
+
+
+def render_model_card(df: pd.DataFrame | None = None) -> None:
     try:
         art = load_artifacts()
     except Exception as exc:  # noqa: BLE001
@@ -618,33 +815,45 @@ def render_model_card() -> None:
     meta = art["meta"]
     st.markdown(
         theme.section("Model card",
-                      "What is deployed, on what it was trained, how well it does, "
-                      "how much that varies, and where it should not be trusted."),
+                      "What is deployed, on what it was trained, how well it does, how much "
+                      "that varies, where it should not be trusted, what it changes for "
+                      "customers, and where each number comes from. Tags say what kind of "
+                      f"number a card shows: {theme.tag('observed')} counted in the data, "
+                      f"{theme.tag('assumed')} no data source, {theme.tag('derived')} computed "
+                      f"from the two, {theme.tag('planned')} a design choice."),
         unsafe_allow_html=True)
 
+    observed = theme.tag("observed")
     st.markdown(
         theme.kpi_row([
             ("Lead-time MAE", f"{meta['p1a']['test_mae']:.2f} d",
-             "held-out test period", theme.PRIMARY),
+             f"{observed} held-out test period", theme.PRIMARY),
             ("Late-flag ROC-AUC", f"{meta['p1b']['test_roc_auc']:.3f}",
-             f"PR-AUC {meta['p1b']['test_pr_auc']:.3f} vs "
+             f"{observed} PR-AUC {meta['p1b']['test_pr_auc']:.3f} vs "
              f"{meta['p1b']['test_pr_auc_floor']:.3f} floor", theme.GOLD),
             ("Review-risk ROC-AUC", f"{meta['p2']['test_roc_auc']:.3f}",
-             f"balanced acc {meta['p2']['test_balanced_accuracy']:.3f}", theme.GREEN),
+             f"{observed} balanced acc {meta['p2']['test_balanced_accuracy']:.3f}", theme.GREEN),
             ("Review PR-AUC lift",
              f"{meta['p2']['test_pr_auc'] / meta['p2']['test_pr_auc_floor']:.1f}×",
-             "over the no-skill floor", theme.ACCENT),
+             f"{observed} over the no-skill floor", theme.ACCENT),
         ]),
         unsafe_allow_html=True)
 
+    rules = load_table("customer_promise_rules.csv")
+    margin = (float(rules.loc[rules["rule"].str.startswith("R1"), "buffer_days"].iloc[0])
+              if rules is not None else None)
+    quote_rule = (f"quote the forecast plus the {margin:g}-day margin, rounded up to a "
+                  "calendar day" if margin is not None else "quote with the forecast")
+
     # -- what is deployed, read from the artifacts themselves ---------------
     st.markdown("#### What is deployed")
-    st.dataframe(pd.DataFrame([
+    # A wrapping table: the cells are sentences, and a grid would cut them off.
+    st.markdown(theme.table(pd.DataFrame([
         {"Problem": "P1A · lead time (regression, at checkout)",
          "Deployed model": meta["p1a"]["label"],
          "As pickled": _as_pickled(art["p1a"]),
          "Artifact": _artifact("p1a_leadtime.joblib"),
-         "Decision rule": "re-quote with the estimate; flag via P1B",
+         "Decision rule": quote_rule,
          "Test": f"MAE {meta['p1a']['test_mae']:.2f} d · RMSE {meta['p1a']['test_rmse']:.2f} · "
                  f"R² {meta['p1a']['test_r2']:.3f}"},
         {"Problem": "P1B · late vs promise (classification, at checkout)",
@@ -652,7 +861,9 @@ def render_model_card() -> None:
          "As pickled": _as_pickled(art["platt"])
                        + " on (predicted − promised days), fitted on validation",
          "Artifact": _artifact("p1b_margin_to_risk.joblib"),
-         "Decision rule": f"flag when risk ≥ {meta['p1b']['threshold']:.2f}",
+         "Decision rule": f"flag when risk ≥ {meta['p1b']['threshold']:.2f}; a warning to the "
+                          "customer only for the riskiest tenth, and only if the platform "
+                          "keeps its own date",
          "Test": f"ROC {meta['p1b']['test_roc_auc']:.3f} · PR-AUC {meta['p1b']['test_pr_auc']:.3f} · "
                  f"balanced acc {meta['p1b']['test_balanced_accuracy']:.3f}"},
         {"Problem": "P2 · low review (classification, at delivery)",
@@ -662,7 +873,7 @@ def render_model_card() -> None:
          "Decision rule": f"flag when risk ≥ {meta['p2']['threshold']:.2f}; rank for the top-K",
          "Test": f"ROC {meta['p2']['test_roc_auc']:.3f} · PR-AUC {meta['p2']['test_pr_auc']:.3f} · "
                  f"F1 {meta['p2']['test_f1']:.3f}"},
-    ]), hide_index=True, use_container_width=True)
+    ]), bold=("Problem",)), unsafe_allow_html=True)
     st.caption(
         "The review model that is served is the StackingClassifier the pre-registered "
         "selection rule chose (best mean rank over the three most recent out-of-sample "
@@ -672,15 +883,29 @@ def render_model_card() -> None:
         "seeing the test window would be selecting on the test set. Both artifacts are "
         "a few hundred kilobytes.")
 
+    never_note = ""
+    try:
+        import journey
+
+        jr = journey.load_journeys()
+        never = jr["outcome"] == "never delivered"
+        top10 = jr["low_rank_purchase_day"] <= 10
+        never_note = (
+            f"- **Some reviewed orders never arrived.** {100 * never.mean():.1f}% of the "
+            "reviewed test orders were cancelled, unavailable or not yet delivered when the "
+            "extract ends; their empty delivery fields make them easy to rank, and they are "
+            f"{100 * never[top10].mean():.0f}% of the slides' daily top-ten picks. A call at "
+            "delivery cannot reach these customers; the promised-date message can, and the "
+            "Replay tab shows what each of them went through.\n")
+    except Exception:  # noqa: BLE001 - the bullet is context, not a number the card needs
+        pass
+
     c1, c2 = st.columns(2, gap="medium")
     with c1:
         st.markdown("#### Training")
         st.markdown(
-            f"- Window **{meta['window'][0]} → {meta['window'][1]}**\n"
-            f"- Train to **{meta['train_end']}**, validation to **{meta['val_end']}**, "
-            f"test thereafter — scored once, for models already chosen\n"
-            f"- Chronological split, disjoint on `customer_unique_id`\n"
-            f"- Seed **{meta['seed']}**, {meta['n_search_iter']} randomised search "
+            _split_lines(df, meta)
+            + f"- Seed **{meta['seed']}**, {meta['n_search_iter']} randomised search "
             f"draws per model (six for the random forests), five expanding-window folds\n"
             f"- Thresholds and the margin-to-risk mapping fitted on the validation period")
         hp = load_table("hyperparameters.csv")
@@ -707,16 +932,13 @@ def render_model_card() -> None:
             "- **Review risk is scored at delivery.** Asked at checkout, the same "
             "target is far weaker, because the variable that matters most has not "
             "happened yet.\n"
-            "- **The value of outreach is assumed, not measured.** The cost analysis "
-            "assumes a contact prevents the low review it reaches; nobody in this "
-            "data was ever contacted. The pilot below is how that would be tested.\n"
+            "- **The value of a contact is assumed, not measured.** The reais below "
+            "count a contact as worth the 1–2 star rating it turns around; the tables "
+            "record no contact other than the survey, so only a randomised pilot can "
+            "measure that effect. The pilot calculator below sizes one.\n"
             "- **A new seller has no track record.** The history features fall back "
             "to route, then state, then platform, and the model is told so.\n"
-            "- **Some reviewed orders never arrived.** 2.2% of the test orders were "
-            "cancelled or still in transit when the extract was taken; their missing "
-            "delivery fields make them easy to rank, and they are 37% of the daily "
-            "top-ten picks. A delivery-day call cannot reach them - the promised-date "
-            "contact can - and the Replay tab marks them *not delivered*.\n"
+            + never_note +
             "- **These are decision scores for triage, not entitlements.** They "
             "must not be used to penalise a seller or price a customer.")
 
@@ -755,63 +977,284 @@ def render_model_card() -> None:
         st.markdown("#### What a ranked list delivers at a fixed capacity")
         st.caption(
             "Precision@K and Recall@K of the review-risk model on the held-out test "
-            "window. A customer-experience team that can contact K% of the day's "
-            "deliveries works the list from the top; precision stays above the "
-            "break-even of 0.125 at every capacity shown, so the team's capacity, "
-            "not the model's threshold, is what limits the value. The Replay-a-day "
-            "tab shows the same list for any single test day.")
+            "window: the top K% of reviewed test orders by review risk, and the share "
+            "whose customer went on to rate the order 1–2 stars (historical outcome). A "
+            "team works the list from the top, so its capacity, not the model's "
+            "threshold, limits what it reaches; whether a contact pays depends on the "
+            "two assumed costs and on how many of those customers it can still reach, "
+            "below. The Replay-a-day tab shows the list for any single test day.")
         show = (cap[cap["k_pct"].isin([1, 2, 5, 10, 15, 20, 30])]
                 [["k_pct", "precision_at_k", "recall_at_k", "lift_at_k"]]
-                .rename(columns={"k_pct": "capacity K (% of deliveries)",
-                                 "precision_at_k": "precision@K",
-                                 "recall_at_k": "recall@K",
+                .rename(columns={"k_pct": "capacity K (% of reviewed test orders)",
+                                 "precision_at_k": "precision@K (observed)",
+                                 "recall_at_k": "recall@K (observed)",
                                  "lift_at_k": "lift vs random"}))
-        st.dataframe(show.round(3), hide_index=True, use_container_width=True)
+        st.dataframe(show, hide_index=True, use_container_width=True, column_config={
+            c: st.column_config.NumberColumn(format="%.3f") for c in show.columns[1:]})
 
-    # -- the pilot that would measure what the cost analysis assumes ---------
-    be = load_table("pilot_breakeven.csv")
-    if be is not None and len(be):
-        st.markdown("#### Sizing the outreach pilot")
-        st.caption(
-            "Randomise inside the top-K list — contact half, leave half — and compare "
-            "the 1–2 star rate of the two arms. The control arm's rate is the model's "
-            "precision at that daily capacity, already measured; the pilot measures "
-            "the treated arm. Two-sided two-proportion test at alpha = 0.05.")
-        try:
-            import pilot_design as PD
-
-            be = be.set_index("k_per_day")
-            k1, k2, k3 = st.columns(3)
-            k = k1.selectbox("Daily capacity K", be.index.tolist(), index=1, key="pilot_k")
-            rr = k2.slider("Assumed reduction in low reviews among those contacted (%)",
-                           5, 60, 25, step=5, key="pilot_rr") / 100
-            power = k3.radio("Power", ["80%", "90%"], horizontal=True, key="pilot_power")
-            p0 = float(be.loc[k, "control_rate"])
-            p1 = p0 * (1 - rr)
-            n = PD.n_per_arm(p0, p1, power=0.8 if power == "80%" else 0.9)
-            weeks = int(np.ceil(2 * n / k / 7))
-            net = (p0 - p1) * 40.0 - 5.0
-            breakeven = float(be.loc[k, "breakeven_relative_reduction"])
-            st.markdown(theme.kpi_row([
-                ("Control-arm rate", f"{100 * p0:.0f}%",
-                 f"precision of the top-{k} each day", theme.PRIMARY),
-                ("Orders per arm", f"{int(n):,}",
-                 f"about {weeks} week{'s' if weeks != 1 else ''} at {k} contacts a day", theme.GOLD),
-                ("Net benefit per contact", f"R$ {net:+.2f}",
-                 "under R$5 : R$40", theme.GREEN if net > 0 else theme.ACCENT),
-                ("Break-even effect", f"{100 * breakeven:.0f}%",
-                 "reduction needed for a contact to pay", theme.ACCENT),
-            ]), unsafe_allow_html=True)
-        except Exception as exc:  # noqa: BLE001
-            st.caption(f"Pilot calculator unavailable: `{type(exc).__name__}: {exc}`")
+    render_customer_outcomes(margin)
+    render_value_and_pilot()
+    render_provenance()
 
     st.markdown("#### Reproducibility")
-    st.code("python tests/test_leakage.py     # validation checks, incl. deployed-model consistency\n"
-            "python src/train_models.py       # refits everything and rewrites models/\n"
-            "python src/capacity_metrics.py   # Precision@K / Recall@K from the saved predictions\n"
-            "python src/selection_tables.py   # fold-to-fold variation and selected hyperparameters\n"
-            "python src/pilot_design.py       # the outreach pilot sizing shown above\n"
-            "python src/phase3_stats.py       # regenerates every number in the final report",
+    st.code("python tests/test_leakage.py       # validation checks, incl. deployed-model consistency\n"
+            "python src/train_models.py         # refits everything and rewrites models/\n"
+            "python src/capacity_metrics.py     # Precision@K / Recall@K from the saved predictions\n"
+            "python src/selection_tables.py     # fold-to-fold variation and selected hyperparameters\n"
+            "python src/pilot_design.py         # the pilot as designed on slide 11\n"
+            "python src/review_timing.py        # when reviews are written, and who a call can still reach\n"
+            "python src/customer_view.py        # the customer tables: journeys, outcomes, contacts, values, pilot arms\n"
+            "python src/slide_provenance.py     # where every number on the slides comes from\n"
+            "python src/phase3_stats.py         # regenerates every number in the final report",
             language="bash")
     st.caption(f"Artifacts built {art['p1a'].get('saved_at', 'n/a')} on "
                f"scikit-learn {art['p1a'].get('sklearn_version', 'n/a')}.")
+
+
+# ===========================================================================
+# UI - model card: customers, value, pilot, provenance
+# ===========================================================================
+def render_customer_outcomes(margin: float | None) -> None:
+    """What the recommendations change for customers, counted in the data."""
+    rules = load_table("customer_promise_rules.csv")
+    outc = load_table("customer_outcomes_test.csv")
+    lists = load_table("customer_contact_lists.csv")
+    if rules is None or outc is None or lists is None:
+        return
+    test = rules[rules["period"] == "test"].set_index("rule")
+    olist = test.loc["Olist's own promise"]
+    r1 = test[test.index.str.startswith("R1")].iloc[0]
+    o = outc.set_index("key")
+    dd = lists.set_index("list").loc["delivery_day_k10"]
+    obs, der = theme.tag("observed"), theme.tag("derived")
+
+    st.markdown("#### What the recommendations change for customers")
+    st.markdown(theme.kpi_row([
+        ("Promised dates broken",
+         f"{1000 * olist['n_late'] / olist['n']:.0f} → {1000 * r1['n_late'] / r1['n']:.0f}",
+         f"{obs} today → {der} with the forecast plus the {margin:g}-day margin; out of "
+         "every 1,000 delivered orders", theme.PRIMARY),
+        ("No parcel when the day ended", f"{o.loc['overdue_eod', 'per_1000']:.1f}",
+         f"{obs} per 1,000 orders placed: the customers a promised-date message reaches "
+         "first; the tables record no message to them", theme.GOLD),
+        ("Not yet rated then, later 1–2★", f"{o.loc['eod_low_not_yet_written', 'per_1000']:.1f}",
+         f"{obs} per 1,000 orders placed: reached by that message before they rate",
+         theme.ACCENT),
+        ("Delivery-day top ten", f"{100 * dd['precision']:.0f} in 100",
+         f"{obs} went on to rate 1–2★, against {100 * dd['pool_base_rate']:.0f} at random "
+         f"({dd['lift']:.1f}×)", theme.GREEN),
+    ]), unsafe_allow_html=True)
+
+    tbl = outc[outc["key"] != "placed"]
+    show = pd.DataFrame({
+        "what the customers went through": tbl["outcome"].str.replace("1-2", "1–2", regex=False),
+        "customers": [f"{int(v):,}" for v in tbl["orders"]],
+        "out of": [f"{int(n):,} {'orders placed' if d == 'placed' else 'delivered orders'}"
+                   for d, n in zip(tbl["denominator"], tbl["denominator_n"])],
+        "per 1,000": tbl["per_1000"].round(1),
+        "95% interval": [f"{lo:.1f}–{hi:.1f}" for lo, hi in zip(tbl["ci95_lo"], tbl["ci95_hi"])],
+    })
+    # 352 px: the header and nine whole rows (35 px each); the rest scroll.
+    st.dataframe(show, hide_index=True, use_container_width=True, height=352,
+                 column_config={"what the customers went through":
+                                st.column_config.TextColumn(width="large"),
+                                "per 1,000": st.column_config.NumberColumn(format="%.1f")})
+    st.caption(
+        "Counted in the data, with no assumption: every row names its population, the "
+        f"{int(o.loc['placed', 'orders']):,} orders placed in the held-out window or the "
+        f"{int(o.loc['prewarn_flagged', 'denominator_n']):,} delivered among them; Wilson "
+        "95% intervals (customer_outcomes_test.csv). The broken-promise rate with the "
+        "margin replays the rule on the same orders and assumes no customer would have "
+        "acted differently on a later date (customer_promise_rules.csv).")
+
+
+@theme.fragment
+def render_value_and_pilot() -> None:
+    """The two assumed costs as inputs, what each contact is worth under them, and the
+    pilot that would measure the one number the data cannot show."""
+    import config
+
+    lists = load_table("customer_contact_lists.csv")
+    value = load_table("customer_value.csv")
+    arms = load_table("customer_pilot_arms.csv")
+    if lists is None or value is None or arms is None:
+        return
+    L = lists.set_index("list")
+    V = value.set_index(["list", "scope"])
+    A = arms.set_index("arm")
+    n_reviewed = int(L.loc["slides_ten_a_day", "pool_n"])
+
+    st.markdown("#### What a contact is worth, and the pilot that would measure it")
+    st.markdown(
+        f'<div class="bw-sec"><p>{theme.tag("assumed")} Olist publishes no costs, so both '
+        "reais figures below are assumptions (src/config.py COSTS); change them here. "
+        f"Everything else on this panel is {theme.tag('observed')} on the held-out window "
+        f"or {theme.tag('derived')} from the two, per 1,000 reviewed orders "
+        f"({n_reviewed:,} reviewed test orders).</p></div>", unsafe_allow_html=True)
+    c1, c2, _ = st.columns([1, 1, 1])
+    cost = float(c1.number_input("Cost of a contact, R$ (assumed)", min_value=0.0,
+                                 max_value=500.0, value=float(config.COSTS["outreach_cost"]),
+                                 step=0.5, key="mc_cost"))
+    worth = float(c2.number_input("Value of a 1–2 star rating turned around, R$ (assumed)",
+                                  min_value=1.0, max_value=5000.0,
+                                  value=float(config.COSTS["low_review_cost"]), step=5.0,
+                                  key="mc_worth"))
+
+    rows = []
+    for name, label, who in CONTACTS:
+        allh = V.loc[(name, "all hits")]
+        reach = V.loc[(name, "reachable at its moment")]
+        contacts = float(reach["contacts"])
+        per_1k = 1000 * contacts / n_reviewed
+        p_reach = float(reach["precision"])
+        be = cost / (worth * p_reach) if p_reach > 0 else np.inf
+
+        def net(e: float) -> float:
+            return 1000 * (e * float(reach["hits"]) * worth - contacts * cost) / n_reviewed
+
+        rows.append({
+            "contact": label, "who it reaches": who,
+            "contacts per 1,000 reviewed orders (observed)": f"{per_1k:.1f}",
+            "rated 1–2★, per 100 contacts (observed)": f"{100 * float(allh['precision']):.1f}",
+            "of whom not yet rated at that moment, per 100 contacts (observed)":
+                f"{100 * p_reach:.1f}",
+            "break-even share turned around (derived)":
+                f"{100 * be:.1f}%" + (" (cannot pay)" if be > 1 else ""),
+            "net R$ if all are turned around (derived)": _signed(net(1.0), 0).lstrip("+"),
+            "net R$ if one in two (derived)": _signed(net(0.5), 0).lstrip("+"),
+            "net R$ if one in four (derived)": _signed(net(0.25), 0).lstrip("+"),
+        })
+    value_tbl = pd.DataFrame(rows)
+    st.markdown(theme.table(value_tbl, numeric=tuple(value_tbl.columns[2:]), bold=("contact",),
+                            widths={"contact": "10rem", "who it reaches": "15rem"}),
+                unsafe_allow_html=True)
+    st.caption(
+        "A contact can only turn around a customer who has not yet rated the order, so "
+        "each value counts the customers still reachable at that contact's moment; the "
+        "net is per 1,000 reviewed orders, at three shares of them turned around. The "
+        "slides valued their list by every customer on it, including those who had "
+        "already rated a late parcel or whose order never came (customer_value.csv "
+        "keeps both scopes).")
+
+    # -- the pilot ---------------------------------------------------------------
+    st.markdown("##### Sizing the pilot")
+    try:
+        import pilot_design as PD
+
+        label = st.radio("Pilot arm", list(ARMS), horizontal=True, key="pilot_arm")
+        arm, list_name = ARMS[label]
+        if arm == "arm_b":
+            three = st.radio("Arms", ["Two: the message against current practice",
+                                      "Three: also separates the survey timing"],
+                             horizontal=True, key="pilot_b_arms")
+            arm = "arm_b_three" if three.startswith("Three") else "arm_b_two"
+        a = A.loc[arm]
+        st.caption(f"Who is randomised: {a['population']}. Two-sided two-proportion test "
+                   "at alpha = 0.05; the primary outcome is each randomised customer's "
+                   "final rating.")
+        k1, k2 = st.columns([1.4, 1])
+        effect = float(k1.number_input(
+            "Effect to detect: fewer 1–2★ ratings among those contacted (%)",
+            min_value=1.0, max_value=95.0, value=float(100 * a["target_relative"]), step=1.0,
+            format="%.1f", key=f"pilot_effect_{arm}")) / 100
+        power = k2.radio("Power", ["80%", "90%"], horizontal=True, key="pilot_power")
+        p0 = float(a["control_rate"])
+        p1 = p0 * (1 - effect)
+        n = PD.n_per_arm(p0, p1, power=0.8 if power == "80%" else 0.9)
+        per_day = float(a["per_day"])
+        n_arms = int(a["arms"])
+        weeks = int(np.ceil(n_arms * n / per_day / 7))
+        net_contact = (p0 - p1) * worth - cost
+        if abs(net_contact) < 0.005:   # an arm sized at its break-even nets nothing
+            net_contact = 0.0
+        be_rel = cost / (worth * p0)
+        per_1k = float(L.loc[list_name, "contacts_per_1k_reviewed"])
+        per_txt = f"{per_day:.0f}" if abs(per_day - round(per_day)) < 1e-9 else f"{per_day:.1f}"
+        st.markdown(theme.kpi_row([
+            ("Rate without contact", f"{100 * p0:.1f}%",
+             f"{theme.tag('observed')} rated 1–2★ on the test window; a historical rate, "
+             "not a control group", theme.PRIMARY),
+            ("Customers per arm", f"{n:,.0f}",
+             f"{theme.tag('planned')} {n_arms} arms; about {weeks} week"
+             f"{'s' if weeks != 1 else ''} at {per_txt} listed a day", theme.GOLD),
+            ("Net per contact", f"R&#36; {_signed(net_contact, 2)}",
+             f"{theme.tag('derived')} at a {100 * effect:.1f}% effect and the assumed costs",
+             theme.GREEN if net_contact > 0 else theme.ACCENT),
+            ("Break-even effect", f"{100 * be_rel:.1f}%",
+             f"{theme.tag('derived')} the reduction a contact needs to pay", theme.ACCENT),
+            ("If rolled out", f"R&#36; {_signed(per_1k * net_contact, 0)}",
+             f"{theme.tag('derived')} per 1,000 reviewed orders: {per_1k:.1f} contacts × "
+             "net per contact", theme.GREEN if net_contact > 0 else theme.ACCENT),
+        ]), unsafe_allow_html=True)
+        if arm == "arm_a":
+            d = L.loc["delivery_day_k10"]
+            real_weeks = int(np.ceil(n_arms * n / float(d["contacts_per_day"]) / 7))
+            st.caption(
+                f"On the test window the delivery-day list held ten customers on "
+                f"{int(d['full_days'])} of {int(d['days'])} delivery days "
+                f"({float(d['contacts_per_day']):.1f} a day on average); at that rate the "
+                f"pilot needs about {real_weeks} weeks.")
+        if arm == "slide_design":
+            s = L.loc["slides_ten_a_day"]
+            ceiling = 100 * (float(s["hits_delivery_only"]) + float(s["hits_either"])) \
+                / float(s["contacts"])
+            rel = ceiling / (100 * p0)
+            st.warning(
+                f"On this list a delivery-day call can change at most {ceiling:.1f} of the "
+                f"{100 * p0:.1f} points ({100 * rel:.0f}% relative), "
+                f"{'below' if rel < be_rel else 'above'} the {100 * be_rel:.1f}% break-even.")
+    except Exception as exc:  # noqa: BLE001
+        st.caption(f"Pilot calculator unavailable: `{type(exc).__name__}: {exc}`")
+
+
+def _dec(value, decimals: int = 1) -> str:
+    """A number with a true minus sign when it is negative ('−1.0', not '-1.0')."""
+    return f"{float(value):,.{decimals}f}".replace("-", "−")
+
+
+def _signed(value: float, decimals: int) -> str:
+    """'+0.47' or '−71', with thousands separators; a value that rounds to zero
+    prints with no sign ('0.00'), so a break-even arm does not read '+0.00' or '-0.00'."""
+    text = f"{abs(value):,.{decimals}f}"
+    if float(text.replace(",", "")) == 0:
+        return text
+    return ("+" if value > 0 else "−") + text
+
+
+def render_provenance() -> None:
+    """Every number on the locked slides, with its kind and source (slide_provenance.csv)."""
+    prov = load_table("slide_provenance.csv")
+    if prov is None:
+        return
+    with st.expander("Where the numbers on the slides come from"):
+        slides = [11] + sorted(int(s) for s in prov["slide"].unique() if int(s) != 11)
+        options = [f"Slide {s}" for s in slides] + ["All slides"]
+        pick = st.selectbox("Slide", options, key="prov_slide")
+        rows = prov if pick == "All slides" else prov[prov["slide"] == int(pick.split()[-1])]
+        show = pd.DataFrame({
+            "slide": rows["slide"].astype(int),
+            "on the slide": rows["on_slide"],
+            "kind": [theme.tag(k) for k in rows["kind"]],
+            "exact value": rows["value"].fillna("—"),
+            "source or formula": rows["source"].fillna("—"),
+            "population and window": rows["window"].fillna("—"),
+            "correction or reading": rows["correction"].fillna("—"),
+        })
+        # Wrapped, not a grid: the sources and corrections are sentences, and a grid
+        # would cut every one of them off at the column edge.
+        st.markdown(theme.table(show, muted=("slide",), bold=("on the slide",),
+                                html_cols=("kind",),
+                                widths={"on the slide": "11rem", "exact value": "6rem",
+                                        "population and window": "12rem",
+                                        "correction or reading": "16rem"},
+                                max_height="44rem" if pick == "All slides" else None),
+                    unsafe_allow_html=True)
+        kinds = prov["kind"].value_counts()
+        checked = int(prov["matches"].astype(str).str.lower().eq("true").sum())
+        st.caption(
+            f"{len(prov)} numbers and phrases on the {prov['slide'].nunique()} slides as "
+            "locked on 4 November 2026 ("
+            + ", ".join(f"{v} {k}" for k, v in kinds.items())
+            + f"); {checked} numeric values were checked against the result files when "
+            "src/slide_provenance.py wrote report/results/slide_provenance.csv. The "
+            "report's slide-provenance appendix prints the same table.")

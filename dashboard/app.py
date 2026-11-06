@@ -12,10 +12,12 @@ the live deployment keeps working without being torn down and recreated.
 Community Cloud applies a push by re-running this main script without
 restarting the Python process, and it only watches files next to the main
 script. deployment/app.py is re-read on every run (runpy), but the modules it
-imports - predict, replay, theme - would stay cached in sys.modules at their
-old version. Evicting them here makes every run import the current files;
+imports - journey, predict, replay, theme - would stay cached in sys.modules at
+their old version. Evicting them here makes every run import the current files;
 Streamlit's cache_data / cache_resource entries key on the function's module
-and source, so the loaded models and tables survive the re-import.
+and source, so the loaded models and tables survive the re-import. (Modules
+under src/ are not evicted: a change there needs an app reboot. No deployment
+module shares a name with a src module.)
 """
 from __future__ import annotations
 
@@ -23,7 +25,7 @@ import runpy
 import sys
 from pathlib import Path
 
-for _stale in ("predict", "replay", "theme"):
+for _stale in ("predict", "replay", "theme", "journey"):
     sys.modules.pop(_stale, None)
 
 runpy.run_path(str(Path(__file__).resolve().parents[1] / "deployment" / "app.py"),

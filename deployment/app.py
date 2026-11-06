@@ -1,20 +1,27 @@
 """
-Olist Brazilian E-Commerce - IT5006 Group 10 dashboard.
+Olist Brazilian E-Commerce - IT5006 Team 10 dashboard.
 
 Run locally:
     streamlit run deployment/app.py     # the application
     streamlit run dashboard/app.py      # the Community Cloud entry point; same thing
 
-Three parts, matching the three project phases:
+Nine tabs, opening on the customer:
 
-  Phase 1  five exploratory tabs over the joined nine-table order frame.
-  Phase 2  a scoring tab that serves the fitted models, and a model card.
-  Phase 3  a replay of the held-out test window, one day at a time, and a model
-           card that states what is deployed, how the candidates varied fold to
-           fold, and how the outreach pilot would be sized.
+  Customer journey  one held-out customer's order from checkout to review: what
+                    they went through, what each model said, and which contact
+                    could still have reached them (journey.py).
+  Phase 1           five exploratory tabs over the joined nine-table order frame.
+  Phase 2           a scoring tab that serves the fitted models, with the date
+                    the customer would be quoted (predict.py).
+  Phase 3           a replay of the held-out test window, one day at a time, blind
+                    and then revealed (replay.py), and a model card that states
+                    what is deployed, what it changes for customers, what a
+                    contact is worth under the assumed costs, how the pilot would
+                    be sized, and where each number on the slides comes from.
 
 All of it reads the same src/data_load.py and src/features.py the notebooks and
-the reports use, so no figure here can disagree with any PDF. The model tabs
+the reports use, and the result tables the analysis scripts write, so no figure
+here can disagree with any PDF; the application refits nothing. The model tabs
 load their artifacts once per server process and cache them, so no visitor pays
 for unpickling a model twice. deployment/README.md documents usage and the CSV contract.
 """
@@ -34,6 +41,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+import journey
 import predict
 import replay
 import theme
@@ -106,39 +114,57 @@ except Exception as exc:  # noqa: BLE001 - last-resort guard for a public app
     st.error(f"**Could not start the dashboard:** `{type(exc).__name__}: {exc}`")
     st.stop()
 
+# The analysis window as configured (start) and as the data reach (last order).
+from config import ANALYSIS_START as _first  # noqa: E402
+
+_last = DF["order_purchase_timestamp"].max()
+
 
 # ===========================================================================
 # Sidebar
 # ===========================================================================
 with st.sidebar:
     st.markdown("### 📦 Olist Explorer")
-    st.caption("IT5006 · Group 10 · Phases 1–3")
+    st.caption("IT5006 · Team 10 · Phases 1–3")
 
     with st.expander("ℹ️  How to use this dashboard", expanded=False):
         st.markdown(
-            "1. **Filter** below — the five exploratory tabs respond.\n"
-            "2. **Overview** — volume, revenue and the Black Friday spike.\n"
-            "3. **Delivery** — the drift and volatility that shape the modelling.\n"
-            "4. **Geography** — where buyers and sellers are, and what that costs.\n"
-            "5. **Satisfaction** — how lateness turns into bad reviews.\n"
-            "6. **Data quality** — what is missing and why.\n"
-            "7. **Predict** — score one order or a whole CSV against the deployed "
-            "models, and get a top-K triage list. Not affected by the filters.\n"
-            "8. **Replay a day** — the deployed models on a held-out test day, "
-            "ranked, with the real outcomes revealable.\n"
-            "9. **Model card** — what is deployed, how well it does, where it "
-            "fails, and how to reproduce it.\n\n"
+            "1. **Customer journey** — one customer's order from checkout to review: "
+            "what they went through, what each model said, which contact could still "
+            "reach them. Opens on the order from our presentation.\n"
+            "2. **Filter** below — four exploratory tabs respond (not Data quality).\n"
+            "3. **Overview** — volume, promises kept, and the Black Friday spike.\n"
+            "4. **Delivery** — the drift and volatility that shape the modelling.\n"
+            "5. **Geography** — where buyers and sellers are, and what that costs.\n"
+            "6. **Satisfaction** — how a broken promise turns into a 1–2 star rating, "
+            "and what unhappy customers wrote.\n"
+            "7. **Data quality** — what is missing and why.\n"
+            "8. **Predict** — score one order as it looks at checkout, see the date the "
+            "customer would be quoted, or score a whole CSV and get a top-K triage "
+            "list. Not affected by the filters.\n"
+            "9. **Replay a day** — the deployed model's list for a held-out test day, "
+            "blind first, then revealed.\n"
+            "10. **Model card** — what is deployed, where not to trust it, what it "
+            "changes for customers, the value and pilot calculators, and where every "
+            "number on the slides comes from.\n\n"
             "Charts are interactive: drag to zoom, double-click to reset."
         )
 
+    _rated = DF.dropna(subset=["review_score"])
+    _kept = 100 * _rated.loc[_rated["is_late"] == 0, "target_low_review"].mean()
+    _broken = 100 * _rated.loc[_rated["is_late"] == 1, "target_low_review"].mean()
     with st.expander("🎬  Five-minute tour", expanded=False):
         st.markdown(
-            "- **Delivery** → the weekly chart: lead time halves, lateness spikes.\n"
-            "- **Satisfaction** → late delivery turns 9% low reviews into 54%.\n"
-            "- **Predict** → score the default São Paulo → Rio order; change the "
-            "promised date and watch the late risk move.\n"
-            "- **Replay a day** → pick 16 July 2018, capacity 10, reveal outcomes.\n"
-            "- **Model card** → the deployed estimators and the fold-to-fold table."
+            "- **Customer journey** → the São Gonçalo customer, who rated the order "
+            "while still waiting for a late parcel.\n"
+            f"- **Satisfaction** → 1–2 star ratings rise from {_kept:.0f}% when the "
+            f"promise is kept to {_broken:.0f}% when it is broken, and what unhappy "
+            "customers wrote.\n"
+            "- **Replay a day** → 16 July 2018, ten contacts: read the list blind, "
+            "then switch on *Reveal what actually happened*.\n"
+            "- **Predict** → score the default São Paulo → Rio order and compare the "
+            "platform's date with the date the forecast plus the margin would quote.\n"
+            "- **Model card** → change the two assumed costs and pick a pilot arm."
         )
 
     st.markdown("#### Filters")
@@ -176,11 +202,12 @@ with st.sidebar:
             "would be biased towards large baskets.\n"
             "- `customer_id` is regenerated per order and is **not a person**; "
             "`customer_unique_id` is.\n"
-            "- 3.0% of orders never reached the customer, so their delivery "
+            "- 3.0% of the 99,441 orders never reached the customer, so their delivery "
             "fields are genuinely undefined rather than missing.\n"
-            "- Values are in Brazilian reais (R$), not inflation-adjusted.\n"
-            "- Window restricted to 2017-01-01 – 2018-08-31; the platform's "
-            "pilot months and the truncated tail are excluded."
+            "- Values are in Brazilian reais (R\\$), not inflation-adjusted.\n"
+            f"- Window: orders placed from {_first.day} {_first:%B %Y} to {_last.day} "
+            f"{_last:%B %Y}; the platform's pilot months and the truncated tail are "
+            "excluded."
         )
 
     st.markdown("---")
@@ -194,16 +221,18 @@ with st.sidebar:
 # ===========================================================================
 st.markdown(
     theme.masthead(
-        "IT5006 · Group 10 · Exploration, Prediction and Deployment",
-        "Olist Brazilian E-Commerce, 2017–2018",
-        f"{len(DF):,} orders joined from <b>nine relational tables</b> · one row per "
-        f"order · {DF['lead_category'].nunique()} product categories across "
-        f"{DF['customer_state'].nunique()} states. The first five tabs explore the "
-        f"data; <b>Predict</b> serves the deployed models, <b>Replay a day</b> runs "
-        f"them over a held-out test day with the outcomes revealable, and "
-        f"<b>Model card</b> states what is deployed and where it should not be "
-        f"trusted. Every view reads the same pipeline as the reports, so the "
-        f"numbers cannot diverge.",
+        "IT5006 · Team 10 · Olist Brazilian E-Commerce, 2017–2018",
+        "A delivery date customers can rely on, and help when it slips",
+        f"Every Olist order carries a promise to a customer: the delivery date shown at "
+        f"checkout. {len(DF):,} orders from <b>nine relational tables</b>, "
+        f"{DF['lead_category'].nunique()} product categories, {DF['customer_state'].nunique()} "
+        f"states. Nine tabs: <b>Customer journey</b> follows one customer's order from "
+        f"checkout to review; five tabs explore the data; <b>Predict</b> scores an order at "
+        f"checkout and shows the date the customer would be quoted; <b>Replay a day</b> "
+        f"ranks a held-out day's customers blind, then reveals what happened; "
+        f"<b>Model card</b> states what is deployed, what it changes for customers, and "
+        f"where each number comes from. Five-minute tour: Customer journey → "
+        f"Satisfaction → Replay 16 July 2018, blind then revealed → Predict → Model card.",
     ),
     unsafe_allow_html=True,
 )
@@ -218,27 +247,63 @@ def _fmt(value, pattern: str) -> str:
     """Format a statistic, or an em dash when the selection has no value for it."""
     return pattern.format(value) if pd.notna(value) else "—"
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
-    ["Overview", "Delivery", "Geography", "Satisfaction", "Data quality",
-     "🔮 Predict", "⏮ Replay a day", "Model card"]
+tab0, tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
+    ["Customer journey", "Overview", "Delivery", "Geography", "Satisfaction",
+     "Data quality", "🔮 Predict", "⏮ Replay a day", "Model card"]
 )
+
+
+# ===========================================================================
+# Tab 0 - Customer journey (not filtered: one held-out order, end to end)
+# ===========================================================================
+with tab0:
+    journey.render_journey()
 
 
 # ===========================================================================
 # Tab 1 - Overview
 # ===========================================================================
 with tab1:
+    _deliv = d.dropna(subset=["delivery_days"])
+    _rev = d.dropna(subset=["review_score"])
+    _rev_deliv = _rev.dropna(subset=["delivery_days"])
+    _asked_early = (_rev_deliv["review_creation_date"]
+                    < _rev_deliv["order_delivered_customer_date"].dt.normalize())
+    _late_rev = _rev_deliv["is_late"] == 1
     st.markdown(
         theme.kpi_row([
             ("Orders", f"{len(d):,}",
              f"{pd.Timestamp(d0).strftime('%b %Y')} – {pd.Timestamp(d1).strftime('%b %Y')}",
              theme.PRIMARY),
-            ("Item revenue", f"R$ {d['total_price'].sum()/1e6:.1f}m",
-             f"median R$ {d['total_price'].median():.0f} per order", theme.GOLD),
+            ("Promise kept", _fmt(100 * (_deliv['is_late'] == 0).mean() if len(_deliv)
+                                  else np.nan, "{:.1f}%"),
+             f"of {len(_deliv):,} delivered orders arrived by the promised date",
+             theme.GREEN),
             ("Median lead time", _fmt(d['delivery_days'].median(), "{:.1f} d"),
-             "purchase to arrival", theme.GREEN),
+             "purchase to arrival", theme.GOLD),
             ("Delivered late", _fmt(100*d['is_late'].mean(), "{:.1f}%"),
-             "vs the promised date", theme.ACCENT),
+             "after the promised date"
+             + _fmt(_deliv.loc[_deliv['is_late'] == 1, 'delay_vs_estimate_days'].median(),
+                    "; by a median {:.1f} days").replace("—", ""), theme.ACCENT),
+        ]),
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        theme.kpi_row([
+            ("Never delivered",
+             _fmt(100 * d['order_delivered_customer_date'].isna().mean() if len(d)
+                  else np.nan, "{:.1f}%"),
+             "of orders placed: cancelled, unavailable or not yet delivered when the "
+             "extract ends", theme.ACCENT),
+            ("Asked to review before the parcel arrived",
+             _fmt(100 * _asked_early.mean() if len(_asked_early) else np.nan, "{:.1f}%"),
+             "of delivered, reviewed orders: survey sent before the delivery day"
+             + (f"; {100 * _asked_early[_late_rev].mean():.0f}% when the parcel was late"
+                if _late_rev.any() else ""), theme.GOLD),
+            ("Rated 1–2 stars",
+             _fmt(100 * _rev['target_low_review'].mean() if len(_rev) else np.nan,
+                  "{:.1f}%"),
+             f"of {len(_rev):,} reviewed orders", theme.ACCENT),
         ]),
         unsafe_allow_html=True,
     )
@@ -404,7 +469,9 @@ with tab2:
 
     c1, c2 = st.columns(2, gap="medium")
     with c1:
-        st.markdown(theme.section("How long delivery takes", ""), unsafe_allow_html=True)
+        st.markdown(theme.section("How long delivery takes",
+                                  "Purchase to arrival; the red line is the median."),
+                    unsafe_allow_html=True)
         fig = px.histogram(dd.assign(v=dd["delivery_days"].clip(upper=60)), x="v",
                            nbins=50, labels={"v": "days (clipped at 60)"})
         fig.update_traces(marker_color=theme.PRIMARY)
@@ -469,9 +536,10 @@ with tab3:
         theme.note(
             "Distance is the strongest checkout-time signal",
             "The median order travels <b>434 km</b> and only 35.7% stay inside the "
-            "customer's own state. Distance correlates with lead time at r = 0.40 — "
-            "ahead of the platform's own delivery estimate (r = 0.38) — which is why "
-            "it is the most valuable feature available before an order ships."
+            "customer's own state. Distance correlates with lead time at r = 0.39 "
+            "(0.40 on the log scale the model uses) — ahead of the platform's own "
+            "delivery estimate (r = 0.38) — which is why it is the most valuable "
+            "feature available before an order ships."
         ),
         unsafe_allow_html=True,
     )
@@ -497,12 +565,13 @@ with tab3:
 # ===========================================================================
 with tab4:
     st.markdown(
-        theme.section("What turns a delivery into a bad review",
+        theme.section("When a delivery leaves the customer unhappy",
                       "The strongest relationship in the dataset."),
         unsafe_allow_html=True,
     )
 
     r = d.dropna(subset=["review_score"])
+    _never_r = r[r["order_delivered_customer_date"].isna()]
     st.markdown(
         theme.kpi_row([
             ("Mean review", f"{r['review_score'].mean():.2f} ★",
@@ -510,11 +579,16 @@ with tab4:
             ("1–2 star rate", f"{100*r['target_low_review'].mean():.1f}%",
              "the minority class", theme.ACCENT),
             ("If delivered on time",
-             f"{100*r.loc[r['is_late']==0,'target_low_review'].mean():.1f}%",
+             _fmt(100*r.loc[r['is_late']==0,'target_low_review'].mean(), "{:.1f}%"),
              "1–2 star rate", theme.GREEN),
             ("If delivered late",
-             f"{100*r.loc[r['is_late']==1,'target_low_review'].mean():.1f}%",
+             _fmt(100*r.loc[r['is_late']==1,'target_low_review'].mean(), "{:.1f}%"),
              "1–2 star rate", theme.ACCENT),
+            ("If never received",
+             _fmt(100*_never_r['target_low_review'].mean() if len(_never_r) else np.nan,
+                  "{:.1f}%"),
+             f"1–2 star rate of {len(_never_r):,} reviewed orders never delivered",
+             theme.ACCENT),
         ]),
         unsafe_allow_html=True,
     )
@@ -525,22 +599,36 @@ with tab4:
         fig = px.bar(x=rs.index, y=rs.values,
                      labels={"x": "review score", "y": "% of reviews"})
         fig.update_traces(marker_color=theme.PRIMARY,
-                          text=[f"{v:.0f}%" for v in rs.values], textposition="outside")
+                          text=[f"{v:.0f}%" for v in rs.values], textposition="outside",
+                          cliponaxis=False)
+        fig.update_yaxes(range=[0, 1.15 * float(rs.max())] if len(rs) else None)
         fig.update_layout(height=340, title="Reviews skew hard to five stars")
         st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG)
     with c2:
-        rr = r.dropna(subset=["delay_vs_estimate_days"]).copy()
-        bins = [-np.inf, -20, -10, -5, 0, 5, 10, 20, np.inf]
-        labels = ["20+ early", "10–20 early", "5–10 early", "0–5 early",
-                  "0–5 late", "5–10 late", "10–20 late", "20+ late"]
-        rr["bucket"] = pd.cut(rr["delay_vs_estimate_days"], bins=bins, labels=labels)
-        prof = (rr.groupby("bucket", observed=True)["target_low_review"]
-                .mean().mul(100).reset_index())
-        fig = px.bar(prof, x="bucket", y="target_low_review",
-                     labels={"bucket": "", "target_low_review": "% scoring 1–2 stars"})
-        fig.update_traces(marker_color=theme.ACCENT)
-        fig.update_layout(height=340, title="Dissatisfaction rises monotonically with lateness")
-        fig.update_xaxes(tickangle=-40)
+        # The report's bins (src/review_timing.lateness_buckets, review_timing_lateness.csv),
+        # computed live on the filtered orders.
+        from review_timing import lateness_buckets
+
+        rr = r.dropna(subset=["delay_vs_estimate_days"])
+        prof = lateness_buckets(rr.assign(low=rr["target_low_review"] == 1))
+        late_side = prof[prof["bucket"].astype(str).isin(
+            ["4-7 days late", "8-14 days late", "15+ days late"])]
+        title = ("One broken promise is enough:<br>from four days late, most customers are "
+                 "unhappy" if len(late_side) == 3 and (late_side["low_pct"] > 50).all()
+                 else "1–2 star rate by how early or late the parcel arrived")
+        fig = px.bar(prof, x="bucket", y="low_pct",
+                     labels={"bucket": "against the promised date",
+                             "low_pct": "% rating 1–2 stars"},
+                     hover_data={"n": ":,"})
+        fig.update_traces(marker_color=theme.ACCENT,
+                          text=[f"{v:.0f}%" for v in prof["low_pct"]], textposition="outside",
+                          cliponaxis=False)
+        # Two-line labels stay horizontal; tilted ones run into the axis title.
+        fig.update_xaxes(tickangle=0, tickmode="array", tickvals=list(prof["bucket"].astype(str)),
+                         ticktext=[str(b).replace(" days ", " days<br>")
+                                   for b in prof["bucket"]])
+        fig.update_layout(height=340, title=title, margin=dict(t=70))
+        fig.update_yaxes(range=[0, 100])
         st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG)
 
     st.markdown(
@@ -556,6 +644,51 @@ with tab4:
         unsafe_allow_html=True,
     )
 
+    # What unhappy customers wrote: src/customer_view.py's topic dictionary over the
+    # comments of 1-2 star reviews (analysis window), not the sidebar selection.
+    try:
+        _topics = journey.load_table("customer_complaint_topics.csv")
+        _labels = journey.load_table("customer_complaint_dictionary.csv")
+        _prec = journey.load_table("customer_complaint_precision.csv")
+    except (FileNotFoundError, OSError):
+        _topics = None
+    if _topics is not None:
+        st.markdown(
+            theme.section("In customers' own words",
+                          "What 1–2 star reviews with a comment talk about, by what happened "
+                          "to the parcel. Analysis window; not affected by the sidebar "
+                          "filters."),
+            unsafe_allow_html=True)
+        _names = dict(zip(_labels["topic"], _labels["label"]))
+        _cols = [c for c in _topics.columns
+                 if c.endswith("_pct") and c != "with_text_pct"]
+        _long = (_topics[_topics["group"] != "all"]
+                 .melt(id_vars=["group"], value_vars=_cols, var_name="topic", value_name="pct"))
+        _long["topic"] = [(_names.get(c[:-4], "no topic matched") if c != "no_topic_pct"
+                           else "no topic matched") for c in _long["topic"]]
+        _order = [_names.get(c[:-4], "no topic matched") if c != "no_topic_pct"
+                  else "no topic matched" for c in _cols]
+        _groups = {"on time": theme.GREEN, "late": theme.ACCENT, "never delivered": theme.GOLD}
+        fig = go.Figure()
+        for _g, _colour in _groups.items():
+            _s = _long[_long["group"] == _g].set_index("topic").reindex(_order)
+            _n = _topics.loc[_topics["group"] == _g, "with_text"]
+            fig.add_bar(y=_order, x=_s["pct"], orientation="h", marker_color=_colour,
+                        name=f"parcel {_g}" + (f" ({int(_n.iloc[0]):,} comments)" if len(_n) else ""),
+                        hovertemplate="%{y}: %{x:.1f}%<extra></extra>")
+        fig.update_yaxes(autorange="reversed")
+        fig.update_layout(barmode="group", height=470, xaxis_title="% of commented 1–2 star reviews",
+                          title="What unhappy customers wrote about")
+        st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG)
+        _all = _topics[_topics["group"] == "all"].iloc[0]
+        st.caption(
+            f"{int(_all['with_text']):,} of the {int(_all['low_reviews']):,} 1–2 star reviews "
+            f"in the analysis window carry a comment. Keyword matching, overlapping topics, "
+            f"held-out precision {_prec['precision_pct'].min():.0f}–"
+            f"{_prec['precision_pct'].max():.0f}% by topic (checked on "
+            f"{int(_prec['read'].sum())} labelled held-out comments); shares are lower "
+            "bounds. Source: report/results/customer_complaint_topics.csv.")
+
 
 # ===========================================================================
 # Tab 5 - Data quality
@@ -569,9 +702,10 @@ with tab5:
 
     st.markdown(
         theme.kpi_row([
-            ("Source tables", "9", "1.45m rows in total", theme.PRIMARY),
+            ("Source tables", "9", "1.55m rows in total", theme.PRIMARY),
             ("Join inflation", "+19%", "if merged naively", theme.ACCENT),
-            ("Never delivered", "3.0%", "delivery fields undefined", theme.GOLD),
+            ("Never delivered", "3.0%", "of all 99,441 orders; delivery fields undefined",
+             theme.GOLD),
             ("Repeat buyers", "3.1%", "only via customer_unique_id", theme.GREEN),
         ]),
         unsafe_allow_html=True,
@@ -612,6 +746,25 @@ with tab5:
         unsafe_allow_html=True,
     )
 
+    # A third, smaller trap: survey dates that precede the order (live from DF, and
+    # the test-window count from customer_journeys_test.csv).
+    _pre = DF["review_creation_date"] < DF["order_purchase_timestamp"].dt.normalize()
+    try:
+        _jr = journey.load_journeys()
+        _jpre = _jr[_jr["review_predates_order"]]
+        _test_txt = (f" {len(_jpre)} of them are reviewed orders of the held-out test window"
+                     + (", all cancelled." if len(_jpre)
+                        and _jpre["order_status"].isin(journey.CANCELLED).all() else "."))
+    except Exception:  # noqa: BLE001 - the count from DF stands on its own
+        _test_txt = ""
+    if int(_pre.sum()):
+        st.caption(
+            f"Dates: {int(_pre.sum())} reviews in the analysis window carry a survey date "
+            f"before their order was placed; "
+            f"{int(_pre[DF['order_status'] == 'canceled'].sum())} of those orders were "
+            f"cancelled.{_test_txt} They are kept as recorded; the Customer journey tab marks "
+            "such an order as a data anomaly.")
+
 # ===========================================================================
 # Tab 6 - Predict  (Phase 2)
 # ===========================================================================
@@ -630,12 +783,12 @@ with tab7:
 # Tab 8 - Model card  (Phases 2-3)
 # ===========================================================================
 with tab8:
-    predict.render_model_card()
+    predict.render_model_card(DF)
 
 
 st.markdown("---")
 st.caption(
-    "IT5006 Fundamentals of Data Analytics · Group Project, Group 10 · National "
+    "IT5006 Fundamentals of Data Analytics · Group Project, Team 10 · National "
     "University of Singapore. Built with Streamlit and scikit-learn. Source code, "
     "notebooks and the final report: "
     "https://github.com/gengyuzccc-cell/Team10_IT5006_Ecommerce_Analytics_AY2627Sem1"

@@ -4,8 +4,15 @@ Visual design system for the Olist dashboard.
 Kept separate from app.py so the styling decisions are reviewable on their own
 and so every chart is guaranteed to use the same template rather than plotly's
 defaults, which is what makes a multi-tab dashboard read as one product.
+
+Besides the template and the CSS it holds the small HTML helpers every tab
+shares: KPI cards, section headers, callouts, the order card of the Customer
+journey tab, and the provenance tags (OBSERVED / ASSUMED / DERIVED / PLANNED)
+that say what kind of number a card shows.
 """
 from __future__ import annotations
+
+import html
 
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -165,6 +172,55 @@ CSS = f"""
       border-radius: 12px; padding: .35rem .55rem .1rem .55rem; margin-bottom: .5rem;
   }}
 
+  /* ---- order card (Customer journey) ---- */
+  .bw-order {{
+      background: {SURFACE}; border: 1px solid {LINE}; border-left: 3px solid {PRIMARY};
+      border-radius: 12px; padding: .8rem 1.1rem .75rem 1.1rem; margin: .4rem 0 .9rem 0;
+  }}
+  .bw-order .kick {{
+      display: block; font-size: .68rem; font-weight: 600; letter-spacing: .06em;
+      text-transform: uppercase; color: {MUTED}; margin-bottom: .2rem;
+  }}
+  .bw-order .ttl {{
+      font-size: 1.12rem; font-weight: 650; color: {INK}; line-height: 1.3;
+      letter-spacing: -.01em;
+  }}
+  .bw-order p {{ font-size: .86rem; color: {MUTED}; margin: .2rem 0 0 0; line-height: 1.5; }}
+
+  /* ---- wrapping table (the journey's moments) ---- */
+  .bw-tblwrap {{
+      overflow-x: auto; margin: .2rem 0 .9rem 0; background: {SURFACE};
+      border: 1px solid {LINE}; border-radius: 10px;
+  }}
+  .bw-tbl {{ width: 100%; border-collapse: collapse; font-size: .80rem; color: {INK}; margin: 0; }}
+  .bw-tbl th {{
+      text-align: left; font-size: .64rem; font-weight: 650; letter-spacing: .05em;
+      text-transform: uppercase; color: {MUTED}; background: {CANVAS};
+      padding: .5rem .6rem; border: none; border-bottom: 1px solid {LINE};
+  }}
+  .bw-tbl td {{
+      padding: .45rem .6rem; border: none; border-bottom: 1px solid {LINE};
+      vertical-align: top; line-height: 1.42;
+  }}
+  .bw-tbl tr:last-child td {{ border-bottom: none; }}
+  .bw-tbl td.muted {{ white-space: nowrap; color: {MUTED}; }}
+  /* Numbers never break; their headers do, or a long header widens its column
+     until the sentences beside it are squeezed into a word per line. */
+  .bw-tbl td.num {{ text-align: right; white-space: nowrap; }}
+  .bw-tbl th.num {{ text-align: right; }}
+
+  /* ---- provenance tags: what kind of number this is ---- */
+  .bw-tag {{
+      display: inline-block; font-size: .58rem; font-weight: 700; letter-spacing: .07em;
+      text-transform: uppercase; padding: .06rem .36rem; border-radius: 4px;
+      margin-right: .32rem; vertical-align: 1px; line-height: 1.45; white-space: nowrap;
+  }}
+  .bw-tag-observed {{ color: #1E4E73; background: rgba(47,111,159,.13); }}
+  .bw-tag-assumed  {{ color: #85570F; background: rgba(192,139,46,.18); }}
+  .bw-tag-derived  {{ color: #54487A; background: rgba(122,108,155,.17); }}
+  .bw-tag-planned  {{ color: #3B6A3A; background: rgba(91,140,90,.17); }}
+  .bw-tag-other    {{ color: {MUTED}; background: {LINE}; }}
+
   /* ---- streamlit widget polish ---- */
   .stTabs [data-baseweb="tab-list"] {{ gap: .35rem; border-bottom: 1px solid {LINE}; }}
   .stTabs [data-baseweb="tab"] {{
@@ -205,3 +261,83 @@ def section(title: str, subtitle: str = "") -> str:
 
 def note(tag: str, body: str) -> str:
     return f'<div class="bw-note"><span class="tag">{tag}</span>{body}</div>'
+
+
+def card(kicker: str, title: str, body: str = "") -> str:
+    """A framed card for one order: a small kicker line, a title, a line of detail.
+
+    Deliberately not a second masthead: the page keeps one h1.
+    """
+    return (f'<div class="bw-order"><span class="kick">{kicker}</span>'
+            f'<div class="ttl">{title}</div><p>{body}</p></div>')
+
+
+TAG_KINDS = ("observed", "assumed", "derived", "planned")
+
+
+def tag(kind: str) -> str:
+    """A provenance badge: OBSERVED, ASSUMED, DERIVED or PLANNED.
+
+    The four kinds of report/results/slide_provenance.csv: observed in the data,
+    assumed with no data source, derived from the two, or planned (a design
+    choice). Any other kind (literature, wording, no data source) gets a grey tag.
+    """
+    k = str(kind).strip().lower()
+    cls = k if k in TAG_KINDS else "other"
+    return f'<span class="bw-tag bw-tag-{cls}">{html.escape(k.upper())}</span>'
+
+
+def esc(text) -> str:
+    """Text from the data, made safe to place inside one of the HTML blocks above.
+
+    Escapes markup, keeps the block on one line (a blank line would end the HTML
+    block and hand the rest to the Markdown parser) and escapes the dollar sign,
+    which Streamlit's Markdown would otherwise read as the start of a formula.
+    """
+    s = html.escape(str(text))
+    s = " / ".join(part.strip() for part in s.splitlines() if part.strip())
+    return s.replace("$", "&#36;")
+
+
+def table(df, numeric=(), muted=(), bold=(), html_cols=(), widths=None,
+          max_height: str | None = None) -> str:
+    """A small table as wrapping HTML. A scrolling grid cuts sentences off at the
+    column edge; a handful of rows that hold sentences read better wrapped.
+
+    numeric columns are right-aligned, muted ones grey and unwrapped, bold ones bold.
+    Every cell is escaped with esc() except in html_cols, whose values are markup
+    this module wrote (a tag()); a missing value prints as an empty cell. widths
+    maps a column to its minimum CSS width; max_height makes a long table scroll.
+    """
+    cols = list(df.columns)
+    widths = widths or {}
+
+    def cls(c) -> str:
+        name = "num" if c in numeric else "muted" if c in muted else ""
+        return f' class="{name}"' if name else ""
+
+    def cell(c, v) -> str:
+        missing = v is None or (isinstance(v, float) and v != v)
+        text = "" if missing else (str(v) if c in html_cols else esc(v))
+        return f"<td{cls(c)}>" + (f"<b>{text}</b>" if c in bold and text else text) + "</td>"
+
+    def th(c) -> str:
+        style = f' style="min-width:{widths[c]}"' if c in widths else ""
+        return f"<th{cls(c)}{style}>{esc(c)}</th>"
+
+    head = "".join(th(c) for c in cols)
+    body = "".join("<tr>" + "".join(cell(c, v) for c, v in zip(cols, row)) + "</tr>"
+                   for row in df.itertuples(index=False))
+    scroll = f' style="max-height:{max_height};overflow-y:auto"' if max_height else ""
+    return (f'<div class="bw-tblwrap"{scroll}><table class="bw-tbl"><tr>{head}</tr>{body}'
+            f'</table></div>')
+
+
+def fragment(func):
+    """st.fragment where Streamlit provides it (1.37+), so a tab's own widgets
+    rerun only that tab; otherwise the function unchanged (older Streamlit, or
+    the stub module tests/test_leakage.py imports the deployment modules with)."""
+    import streamlit as st
+
+    frag = getattr(st, "fragment", None)
+    return frag(func) if callable(frag) else func
