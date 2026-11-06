@@ -1,0 +1,48 @@
+\section{Where the numbers on the slides come from}
+\label{app:provenance}
+
+The slides were locked on 4 November 2026 and are submitted unchanged, as the
+brief requires. At the presentation we were asked where the numbers on the
+business-value slide (slide 11) come from; this appendix answers that for every
+number on every slide. Table~\ref{tab:provenance} lists each one, slide 11 first,
+with its kind, its source or formula and, where the slide's wording is wrong or
+loose, the reading this report stands by. \emph{Observed} numbers are counted in
+the Olist tables, on the test window (orders placed 30 June to 30 August 2018:
+12{,}927 orders, 12{,}855 of them reviewed, 12{,}630 delivered) unless the row
+or its slide's heading names another window. \emph{Assumed} numbers have no data source: Olist publishes
+no costs, so they are inputs we chose, and Appendix~\ref{app:customer} shows what
+changes if they are wrong. \emph{Derived} numbers are arithmetic on the other
+two, with the formula given. \emph{Planned} numbers are design choices: a pilot that has
+not been run, or the size of a recommended list. Three further kinds carry no number to check: a claim taken from the
+\emph{literature}, a claim with \emph{no data source} that the tables can neither
+support nor refute, and \emph{wording} whose reading needs correcting. Of the 105
+rows over the 13 slides, 88 carry a number that \code{src/slide\_provenance.py}
+recomputes from the repository's outputs into
+\code{report/results/slide\_provenance.csv}. All 88 match the slide to half a
+unit of its last digit, except three figures the slides rounded loosely
+(100{,}000 orders, 75\% and the 28 of 27--28\%), which match within the
+wider tolerance recorded in the CSV; the value after the arrow is the recomputed
+one. The script stops if any no longer matches, and a validation check fails if
+the CSV records a mismatch or a cost that is not labelled as assumed.
+
+\input{sections/p3_C_provenance_table}
+
+\paragraph{The deck's vocabulary.} Some of the deck's words are not the
+report's, and some say more than the data show. The adjective the slides attach
+to the team's dates, test, tools, findings and caveats (slides 1, 5--7 and
+10--13) is not used here. A date from the model means the forecast plus a margin
+chosen on validation (Section~\ref{sec:stakeholders}), which the slides did not
+yet have; the test is the out-of-time test window; a finding or a caveat is a
+stated result or limitation; and the platform's own date is described as what it
+is, a commercial choice, padded because a broken promise costs returns and
+retention \citep{cui2024promise}. The verbs the slides use for what a list or a
+flag does with an unhappy customer or a late parcel (slides 1, 6, 7, 9 and 13) mean
+only that the list contains them: precision and recall count customers who went
+on to rate the order 1--2 stars and parcels that arrived late, not ratings or
+deliveries that were changed. ``Pause the review email'' and ``hold the review survey until
+actual arrival'' (slides 6, 10, 11 and 13) and ``Saved before 1$\star$!''
+(slide 13) mean reaching the customer before they rate the order and asking for
+the review once the order is complete; every customer is still asked, and no
+review is filtered, delayed in publication or rewarded. ``Live validation'' and
+``proves'' (slide 11) mean that the held-out days show a pattern; only the pilot
+of Section~\ref{sec:pilot} would measure what a contact changes.

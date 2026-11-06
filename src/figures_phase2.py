@@ -147,7 +147,7 @@ def fig_late_routes() -> str:
          y, p["p_late_direct"].to_numpy(), P),
         ("derived from the lead-time regression", y, p["p_late_derived"].to_numpy(), A),
     ], float(y.mean()))
-    ax1.set_title("(a) Precision--recall", loc="left")
+    ax1.set_title("(a) Precision–recall", loc="left")
     ax2.set_title("(b) ROC", loc="left")
     ax1.legend(loc="upper right", fontsize=7)
     fig.tight_layout()
@@ -167,7 +167,7 @@ def fig_low_review_curves() -> str:
     ax1.plot(rc, pr, color=A, label="selected model")
     ax1.axhline(floor, color=M, ls=":", lw=1.2, label=f"no skill ({floor:.3f})")
     ax1.set_xlabel("recall"), ax1.set_ylabel("precision")
-    ax1.set_title("(a) Precision--recall against the 1--2 star base rate", loc="left")
+    ax1.set_title("(a) Precision–recall, 1–2 star target", loc="left")
     ax1.legend(loc="upper right", fontsize=7.5)
 
     # A model-by-model strip, so the family comparison sits beside the curve.
@@ -239,7 +239,7 @@ def fig_threshold_and_cost() -> str:
     ax1.text(thr, 0.98, f" tuned on validation: {thr:.2f}", fontsize=7.5,
              color="#444", va="top")
     ax1.set_xlabel("decision threshold"), ax1.set_ylim(0, 1.02)
-    ax1.set_title("(a) The precision--recall trade", loc="left")
+    ax1.set_title("(a) The precision–recall trade", loc="left")
     ax1.legend(loc="upper right")
 
     ax2.plot(cost["threshold"], cost["net_benefit_per_1k"], color=P)
@@ -249,7 +249,7 @@ def fig_threshold_and_cost() -> str:
              f" max at {best['threshold']:.2f}", fontsize=7.5, color=A, va="top")
     ax2.axhline(0, color=M, lw=0.8)
     ax2.set_xlabel("decision threshold")
-    ax2.set_ylabel("expected net benefit (R$ per 1,000 orders)")
+    ax2.set_ylabel("net benefit, R$ per 1,000 reviewed orders")
     ax2.set_title("(b) Under the stated cost assumptions", loc="left")
     fig.tight_layout()
     return save_fig(fig, "fig15_threshold_cost")
@@ -269,7 +269,7 @@ def fig_cv_protocol() -> str:
     ax1.set_xticks(x)
     ax1.set_xticklabels(["temporal\nCV", "shuffled\nCV", "forward\ntest"], fontsize=8)
     ax1.set_ylabel("PR-AUC")
-    ax1.set_title("(a) Raw PR-AUC (dotted: each period's no-skill floor)", loc="left")
+    ax1.set_title("(a) Raw PR-AUC (dotted: no-skill floor)", loc="left")
 
     ax2.bar(x, cvp["lift"], 0.55, color=colours[: len(cvp)])
     for i, v in enumerate(cvp["lift"]):
@@ -404,7 +404,7 @@ def fig_capacity() -> str:
         ax1.text(r["flagged_pct"] + 0.7, 0.99 if tuned else 0.86,
                  ("F1 threshold" if tuned else "cost optimum") + f"\n{r['flagged_pct']:.1f}%",
                  fontsize=6.3, color="#444", va="top")
-    ax1.set_xlabel("capacity K, % of delivered orders")
+    ax1.set_xlabel("capacity K, % of reviewed orders")
     ax1.set_ylabel("score")
     ax1.set_ylim(0, 1.02)
     ax1.set_title("(a) Review risk: the top-K list", loc="left")
@@ -545,7 +545,7 @@ def fig_cv_folds() -> str:
                         rotation=20, ha="right")
     ax1.set_ylabel("PR-AUC (out-of-sample)")
     ax1.set_title("(a) Every candidate on every window", loc="left")
-    ax1.legend(fontsize=6.2, loc="upper left", ncol=2)
+    ax1.legend(fontsize=6.2, loc="lower center", ncol=2)
 
     y = np.arange(len(d))
     ax2.errorbar(d["cv_mean"], y, xerr=d["cv_sd"], fmt="o", color=M, capsize=3,
@@ -556,7 +556,7 @@ def fig_cv_folds() -> str:
     ax2.set_yticklabels([short(m, 22) for m in d["model"]], fontsize=7.2)
     ax2.set_xlabel("PR-AUC")
     ax2.set_title("(b) Spread against the forward numbers", loc="left")
-    ax2.legend(fontsize=6.2, loc="upper left")
+    ax2.legend(fontsize=6.2, loc="upper center", bbox_to_anchor=(0.5, -0.17), ncol=3)
     ax2.grid(axis="y", visible=False)
     fig.tight_layout()
     return save_fig(fig, "fig22_cv_folds")
@@ -589,7 +589,7 @@ def fig_pilot() -> str:
         ax1.axvline(r_be, color=colour, ls=":", lw=0.9)
         ax2.axvline(r_be, color=colour, ls=":", lw=0.9)
     ax1.set_yscale("log")
-    ax1.set_xlabel("assumed reduction in low reviews among those contacted, %")
+    ax1.set_xlabel("assumed reduction among those contacted, %")
     ax1.set_ylabel("weeks of pilot (80% power)")
     ax1.set_title("(a) Pilot length by assumed effect", loc="left")
     ax1.legend(fontsize=7)

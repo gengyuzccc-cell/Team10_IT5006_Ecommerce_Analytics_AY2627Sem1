@@ -20,6 +20,7 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{array}
 \usepackage{longtable}
 \usepackage{caption}
 \usepackage{subcaption}
@@ -31,6 +32,9 @@
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage{titlesec}
 \usepackage[hidelinks]{hyperref}
+\hypersetup{pdftitle={Team 10 - Predicting Delivery Performance and Satisfaction
+  Risk on the Olist Marketplace (Phase 3 final report)},
+  pdfauthor={Pan Pinyou, Li Yudan, Zhu Gengyu}}
 
 % Heading spacing a little tighter than the article default; the headings
 % themselves are unchanged.
@@ -68,13 +72,13 @@
 \newcommand{\best}[1]{\textbf{#1}}
 % The number of checks in tests/test_leakage.py. Kept in one place; the test
 % suite prints it, and the README quotes the same number.
-\newcommand{\checkcount}{60}
+\newcommand{\checkcount}{89}
 
 % ---------------------------------------------------------------------------
 \begin{document}
 
 % ============================== COVER PAGE =================================
-\begin{titlepage}
+\pagenumbering{Alph}\begin{titlepage}
 \centering
 \vspace*{3.0cm}
 
@@ -87,12 +91,12 @@ Deployment, Final Report and Presentation\par}
 {\large Predicting Delivery Performance and Satisfaction Risk\\[3pt]
 on the Olist Brazilian E-Commerce Marketplace\par}
 \vspace{0.5em}
-{\normalsize Two prediction moments, one decision chain, and a deployed
-application\par}
+{\normalsize A date the customer can rely on, and help when it slips:\\[2pt]
+two prediction moments and a deployed application\par}
 
 \vspace{3.0cm}
 
-{\large\bfseries Group 10\par}
+{\large\bfseries Team 10\par}
 \vspace{0.9em}
 
 {\normalsize
@@ -109,18 +113,22 @@ Zhu Gengyu  & A0333773Y \\
 {\large IT5006 Fundamentals of Data Analytics\par}
 \vspace{0.4em}
 {\large AY2026/2027 Semester 1 \,$\cdot$\, Final report, November 2026\par}
+\vspace{0.3em}
+{\normalsize Revised after the presentation of 5 November 2026\par}
 
 \vspace{1.0cm}
 {\normalsize
 \textbf{Application:} \url{https://team10-it5006-olist.streamlit.app}\\[4pt]
-\textbf{Repository:} {\small\url{https://github.com/gengyuzccc-cell/Team10_IT5006_Ecommerce_Analytics_AY2627Sem1}}\par}
+\textbf{Repository:}\\[2pt]
+{\footnotesize\url{https://github.com/gengyuzccc-cell/Team10_IT5006_Ecommerce_Analytics_AY2627Sem1}}\par}
 
 \vspace{1.0cm}
 \end{titlepage}
 
 % ============================== CONTENTS ===================================
-\tableofcontents
+\pagenumbering{roman}\tableofcontents
 \clearpage
+\pagenumbering{arabic}
 
 % ============================== BODY =======================================
 \input{sections/p3_00_executive}
@@ -149,6 +157,10 @@ Zhu Gengyu  & A0333773Y \\
 \input{sections/p3_A_appendix}
 \clearpage
 \input{sections/p3_B_figures}
+\clearpage
+\input{sections/p3_C_provenance}
+\clearpage
+\input{sections/p3_D_customer}
 
 % ============================== AI DECLARATION =============================
 \clearpage
@@ -172,12 +184,27 @@ before submission.
 \textbf{OpenAI's ChatGPT} was used to generate and validate ideas, to improve
 expression and to refine our writing.
 
+\textbf{The revision after the presentation of 5 November 2026} used Claude
+Code in the same role, at the team's direction: it proposed and drafted the
+changes made in response to the feedback --- the revised sections and
+appendices of this report and two new analysis scripts,
+\code{src/customer\_view.py} and \code{src/slide\_provenance.py} --- and it
+labelled the 175 held-out comments behind the complaint-topic precision check
+(\code{customer\_topic\_labels.csv}, Appendix~\ref{app:customer}). Every number
+the revision adds is read from a script output in \code{report/results/} or
+\code{report/stats\_phase3.txt}; assertions in the new scripts require the earlier
+results (the deployed models' test predictions, and the lists and values shown
+on the slides) to be reproduced exactly, and
+\code{src/slide\_provenance.py} checks every number on the slides against its
+source (Appendix~\ref{app:provenance}). The revision adds no reference.
+
 The choice of problems, the analysis design (the prediction moments, the
 leakage regimes, the chronological split, the pre-registered success criteria
 and selection rule), the interpretation of the results and the business
-recommendations are the team's own. We reviewed every AI-assisted piece of code
-and text, verified every number against the underlying data by re-running the
-scripts, and checked every reference against the publisher's record or DOI. We
-are responsible for the content and quality of the submitted work.
+recommendations of the report as first submitted are the team's own, and for
+that report we reviewed every AI-assisted piece of code and text, verified every
+number against the underlying data by re-running the scripts, and checked every
+reference against the publisher's record or DOI. We are responsible for the
+content and quality of the submitted work.
 
 \end{document}

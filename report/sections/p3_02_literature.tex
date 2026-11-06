@@ -24,8 +24,9 @@ seller behaviour as much as by service \citep{dellarocas2003digitization}.
 Transactional evidence bridges the two: across more than 15 million marketplace
 orders, \citet{deshpande2023logistics} trace a chain --- logistics performance
 drives the rating a customer leaves, and that rating moves seller sales. That
-chain makes a low-review model a commercial instrument rather than a
-diagnostic, and the rating is the construct this project predicts.
+chain makes the rating more than a diagnostic: it is the customer's own
+verdict, later customers act on it, and it is the construct this project
+predicts.
 
 The promise itself is a second decision variable. \citet{cui2024promise} show
 that committing to a faster delivery date raises sales but increases returns and
@@ -33,17 +34,14 @@ depresses retention, so an estimated delivery date is a business decision, not a
 forecast, and should not be expected to behave like one. Prediction pays only
 when it feeds a decision: \citet{kandula2021prescriptive} route machine-learned
 delivery outcomes into a scheduling optimiser and report cost savings of up to
-10.2\%, the pattern Table~\ref{tab:levers} follows. The same literature warns
-what is \emph{not} observable in an order table --- product expectations, seller
-communication, returns handling --- and any ceiling reported here must be read
-against that omission.
+10.2\%, the pattern Table~\ref{tab:levers} follows.
 
 \subsection{Model families for tabular transactional data}
 
 Regularised linear and logistic models are the natural baseline for structured
 data of this size: cheap, interpretable and, as Section~\ref{sec:results}
 shows, revealing about distribution shift. Within the tree family the
-literature knows three ways to improve on one tree: a random forest bags
+literature knows two ways to improve on one tree: a random forest bags
 decorrelated trees to cut variance \citep{breiman2001rf}; boosting fits trees to
 residuals with shrinkage to cut bias \citep{friedman2001gbm}. Across the large
 empirical comparisons --- ten algorithms on eleven problems
@@ -141,12 +139,11 @@ keeping preprocessing inside each fold.
 
 \subsection{The gap addressed}
 
-The service-quality literature converges on fulfilment as the dominant
-observable driver of e-commerce satisfaction but measures it one way while the
-marketplace measures another; the tabular machine-learning literature converges
-on tree ensembles, and the e-commerce applications that use them rarely say
-\emph{when} the model would run; and the methodological literature is emphatic
-that on imbalanced, temporally ordered data the choice of split, metric and
-imbalance handling decides whether a number means anything. The contribution
-here is narrow and concrete: make the prediction moment a first-class design
-decision, measure its cost, and evaluate at the capacity the stakeholder has.
+The service-quality literature measures fulfilment by survey while the
+marketplace measures a rating; the tabular literature converges on tree
+ensembles without saying \emph{when} the model would run; and the methodological
+literature shows that on imbalanced, temporally ordered data the split, the
+metric and the imbalance handling decide whether a number means anything. The
+contribution here is narrow: make the prediction moment a first-class design
+decision, measure its cost, evaluate at the capacity the stakeholder has, and
+count the result in what changes for the customer.

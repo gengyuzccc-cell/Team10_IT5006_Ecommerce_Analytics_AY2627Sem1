@@ -1,0 +1,388 @@
+\section{\texorpdfstring{The customer's view: the tables behind Sections~\ref{sec:eda} and~\ref{sec:insight}}{The customer's view: the tables behind Sections 4 and 9}}
+\label{app:customer}
+
+Everything here is computed by \code{src/customer\_view.py} from the nine tables,
+the saved test predictions and the deployed lead-time model, scored on the
+validation and test windows exactly as \code{src/train\_models.py} scored them.
+Nothing is refitted: the rescored test forecasts equal
+\code{predictions\_p1a\_test.csv} to $10^{-9}$, an assertion in the script. The
+\emph{test window} is the orders placed 30 June to 30 August 2018; the
+\emph{analysis window}, the orders placed 1 January 2017 to 30 August 2018. Every
+figure is descriptive; the repeat-purchase comparisons are also exploratory.
+
+\paragraph{A date the customer can rely on.} Table~\ref{tab:requote} compares
+the platform's promised date with dates built from the forecast. The margin of
+Section~\ref{sec:stakeholders} is chosen on the validation months alone: the
+smallest margin, in steps of 0.1 day, whose broken-promise rate there is no
+higher than the platform's own (4.97\%), with the date rounded up to a calendar
+day --- eight days. Two margins are shown for reference: the one that matches the
+platform's average quoted wait on the test window (6.9 days), chosen from quoted
+dates and forecasts only, never from outcomes, and the one that matches it on the
+validation months (12.4 days), which pads far more. \emph{Broken} uses the
+report's definition of late (delivered after the promised date begins) for every
+date; the calendar-day column counts only deliveries after the promised day has
+ended.
+
+\begin{table}[htbp]
+\centering
+\caption{Promised dates on the validation and test windows, from
+\code{customer\_promise\_rules.csv}. Broken: share of delivered orders that arrived
+after the date. Let down: broken promises among the 12{,}630 delivered test
+orders. Calendar day: arrived after the promised day ended. Mean wait: the
+average quoted wait, in days. Days late: mean, among broken promises. The
+validation rule picks the margin; the two other margins match the platform's
+average quoted wait on the test and on the validation window. ``Forecast alone''
+is the forecast itself, not rounded up to a calendar date; rounded up, as every
+margin is, it is broken for 25.1\% of test orders
+(\code{customer\_promise\_frontier.csv}).}
+\label{tab:requote}
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+ & \textbf{validation} & \multicolumn{5}{c}{\textbf{test}} \\
+\cmidrule(lr){2-2}\cmidrule(l){3-7}
+\textbf{Date shown to the customer} & \textbf{broken} & \textbf{broken} &
+\textbf{let down} & \textbf{\shortstack[r]{calendar\\day}} &
+\textbf{\shortstack[r]{mean\\wait}} & \textbf{\shortstack[r]{days\\late}} \\
+\midrule
+Platform's own promised date & 4.97\% & 7.41\% & 936 & 4.76\% & 17.5 & 4.4 \\
+Forecast alone & 26.28\% & 31.85\% & 4{,}023 & 22.37\% & 10.1 & 3.4 \\
+\best{Forecast + 8 days} (validation rule) & 4.86\% & \best{2.52\%} & 318 & 2.11\% & 18.6 & 6.8 \\
+Forecast + 6.9 days (platform's wait, test) & 6.03\% & 3.20\% & 404 & 2.58\% & 17.5 & 6.4 \\
+Forecast + 12.4 days (platform's wait, val.) & 2.55\% & 1.10\% & 139 & 0.92\% & 23.0 & 8.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+By region the margin moves the padding to where the risk is
+(\code{customer\_\allowbreak promise\_\allowbreak region.csv}). Southeast
+customers (8{,}951 test orders)
+are let down 8.59\% of the time by the platform's date and 2.41\% by the forecast
+plus eight days, for an average wait quoted 1.4 days longer; in the North and
+Northeast (1{,}312) the rate falls from 5.03\% to 3.58\% at the same average wait
+(26.6 days); in the South and Central-West (2{,}367) from 4.27\% to 2.32\%, for
+0.6 days more. Overall 61.5\% of customers would see a later date than today and
+31.3\% an earlier one, by at least a day, and the dates still missed are missed
+by more: 6.8 days on average, against 4.4. Three cautions. The validation months
+include the May 2018 strike and June's padded promises, so the margin
+over-delivers on the test window: 2.52\% broken, against 7.41\% for the
+platform's date there and the 4.97\% bar it was chosen to meet on validation.
+The forecast over-predicts by 1.74 days on the test window and the margin
+absorbs that bias, so it must be re-chosen at every refit. And the date assumes
+that delivery times and customers do not change because the quote does; the
+forecast also takes the platform's own estimate as an input, so the platform
+would keep computing that estimate and change only the date it shows.
+
+\paragraph{What happened to every 1{,}000 orders.} Table~\ref{tab:outcomes} is
+the full count behind Table~\ref{tab:customer}, with 95\% Wilson intervals
+(\code{customer\_outcomes\_test.csv}). Every row names its population: orders
+placed in the test window (12{,}927) or, for the checkout warning, delivered test
+orders (12{,}630).
+
+\begin{table}[htbp]
+\centering
+\caption{What happened to the customers of the test window, from
+\code{customer\_outcomes\_test.csv}. Per 1{,}000 orders of the population named
+in the third column, with 95\% Wilson intervals. Indented rows are subsets of
+the row above them. ``Reachable'' names the contact that could still have come
+before the customer rated the order (Appendix~\ref{app:timing}).}
+\label{tab:outcomes}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}p{8.2cm}rlrl@{}}
+\toprule
+\textbf{Customers whose order\ldots} & \textbf{orders} & \textbf{of} & \textbf{per 1{,}000} & \textbf{95\% interval} \\
+\midrule
+was placed (purchases 30 June to 30 August 2018) & 12{,}927 & placed & 1{,}000.0 & --- \\
+parcel arrived by the promised date & 11{,}694 & placed & 904.6 & [899.4, 909.6] \\
+parcel arrived after the promised date began (the report's definition) & 936 & placed & 72.4 & [68.1, 77.0] \\
+\quad during the promised day itself & 335 & placed & 25.9 & [23.3, 28.8] \\
+\quad after the promised day ended & 601 & placed & 46.5 & [43.0, 50.3] \\
+parcel never delivered within the extract & 297 & placed & 23.0 & [20.5, 25.7] \\
+\quad order cancelled or unavailable & 149 & placed & 11.5 & [9.8, 13.5] \\
+\addlinespace[2pt]
+no parcel when the promised day ended & 898 & placed & 69.5 & [65.2, 74.0] \\
+\quad of whom never received it & 297 & placed & 23.0 & [20.5, 25.7] \\
+\addlinespace[2pt]
+rated the order 1--2 stars & 1{,}418 & placed & 109.7 & [104.4, 115.2] \\
+\quad parcel on time & 923 & placed & 71.4 & [67.1, 76.0] \\
+\quad parcel late & 287 & placed & 22.2 & [19.8, 24.9] \\
+\quad parcel never delivered & 208 & placed & 16.1 & [14.1, 18.4] \\
+late parcel, 1--2 stars written before it arrived & 222 & placed & 17.2 & [15.1, 19.6] \\
+no parcel when the promised day ended, not yet rated then, went on to rate 1--2 stars & 440 & placed & 34.0 & [31.0, 37.3] \\
+\addlinespace[2pt]
+rated 1--2 stars; reachable only by the promised-date message & 398 & placed & 30.8 & [27.9, 33.9] \\
+rated 1--2 stars; reachable only by a call at delivery & 945 & placed & 73.1 & [68.7, 77.7] \\
+rated 1--2 stars; reachable by either contact & 42 & placed & 3.2 & [2.4, 4.4] \\
+rated 1--2 stars before either moment & 33 & placed & 2.6 & [1.8, 3.6] \\
+\addlinespace[2pt]
+on the slides' daily top-ten list (grouped by purchase day) & 614 & placed & 47.5 & [44.0, 51.3] \\
+\quad and rated the order 1--2 stars & 351 & placed & 27.2 & [24.5, 30.1] \\
+\quad of whom not yet rated when the promised day ended (no parcel then) & 271 & placed & 21.0 & [18.6, 23.6] \\
+\quad of whom reachable only by a call at delivery & 48 & placed & 3.7 & [2.8, 4.9] \\
+\addlinespace[2pt]
+flagged at checkout (late risk at or above the 11\% line) & 5{,}647 & delivered & 447.1 & [438.5, 455.8] \\
+\quad parcel then late & 773 & delivered & 61.2 & [57.2, 65.5] \\
+late parcel, not flagged & 163 & delivered & 12.9 & [11.1, 15.0] \\
+flagged, parcel then on time & 4{,}874 & delivered & 385.9 & [377.5, 394.4] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A parcel delivered during the promised day counts as late under the report's
+definition: 335 of the 936 late test parcels. Their customers rate them much like
+on-time ones (Table~\ref{tab:lateday}, analysis window): 12.3\% gave 1--2 stars,
+against 11.1\% for delivery during the day before and 19.8\% for delivery a day
+later. That is why the promised-date message is triggered when the promised day
+ends, not when it begins.
+
+\begin{table}[htbp]
+\centering
+\caption{The 1--2 star rate by how early or late the parcel arrived against the
+promised date, on the delivered and reviewed orders of the analysis window, with
+95\% Wilson intervals (\code{customer\_lateness\_days.csv}). The promised date is
+a calendar date, so ``during the promised day'' is up to one day after it began.}
+\label{tab:lateday}
+\footnotesize
+\begin{tabular}{@{}lrrl@{}}
+\toprule
+\textbf{Parcel arrived} & \textbf{orders} & \textbf{1--2 stars} & \textbf{95\% interval} \\
+\midrule
+7 or more days early & 70{,}673 & 8.9\% & [8.7, 9.2] \\
+3--7 days early & 12{,}527 & 9.8\% & [9.3, 10.4] \\
+1--3 days early & 3{,}253 & 11.3\% & [10.2, 12.4] \\
+up to 1 day early & 1{,}449 & 11.1\% & [9.6, 12.8] \\
+during the promised day & 1{,}280 & 12.3\% & [10.7, 14.3] \\
+1--2 days late & 819 & 19.8\% & [17.2, 22.6] \\
+2--3 days late & 536 & 34.3\% & [30.4, 38.4] \\
+3--7 days late & 1{,}773 & 61.3\% & [59.0, 63.5] \\
+more than 7 days late & 3{,}251 & 78.3\% & [76.8, 79.7] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{What unhappy customers wrote.} The comments of the 1--2 star reviews
+of the analysis window (the review the repository keeps per order, title and
+message together, lower-cased, accents stripped and common abbreviations
+expanded) are matched against seven overlapping topics, each a regular
+expression in \code{src/customer\_view.py}, listed in
+\code{customer\_complaint\_dictionary.csv}. The patterns were frozen before their
+precision was measured on a random sample of 25 matched comments per topic, each
+comment read and marked right or wrong by the AI assistant used for the revision
+(AI Tool Declaration); \code{customer\_topic\_labels.csv} records the 175
+verdicts, with a note on each miss, so any of them can be re-read. Table~\ref{tab:topics} gives the
+shares. They are lower bounds: 18.9\% of comments match no topic, often a
+paraphrase the patterns miss. The comments separate two failures. Customers whose
+parcel was late or never came write that they do not have it (59.9\% and 58.3\%),
+and those whose order never came also write about refunds and cancellation
+(24.5\%); customers whose parcel came on time write about what was in it: a wrong
+or missing item (34.0\%), quality or a product unlike its description (16.9\%),
+damage or a defect (15.0\%). Comments are written with the rating, so they are
+read here and never used as a feature.
+
+\begin{table}[htbp]
+\centering
+\caption{Topics of 1--2 star comments on the analysis window, as \% of the
+comments in each group (a comment can match several topics), and the held-out
+precision of each pattern with its 95\% Wilson interval. From
+\code{customer\_complaint\_topics.csv} and \code{customer\_complaint\_precision.csv}.}
+\label{tab:topics}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+ & \multicolumn{4}{c}{\textbf{the parcel was}} & \\
+\cmidrule(lr){2-5}
+\textbf{Topic} & \textbf{any} & \textbf{on time} & \textbf{late} & \textbf{never delivered} & \textbf{precision} \\
+\midrule
+1--2 star reviews & 14{,}365 & 8{,}084 & 4{,}136 & 2{,}145 & \\
+\quad with a comment & 10{,}826 & 6{,}385 & 2{,}889 & 1{,}552 & \\
+\midrule
+not received (yet) & 34.5 & 17.3 & 59.9 & 58.3 & 88 [70, 96] \\
+late, slow, missed date & 12.4 & 5.4 & 24.6 & 18.2 & 96 [80, 99] \\
+wrong or missing item & 22.2 & 34.0 & 5.5 & 4.3 & 88 [70, 96] \\
+defective or damaged & 9.5 & 15.0 & 1.7 & 1.8 & 92 [75, 98] \\
+quality, not as described & 10.6 & 16.9 & 2.1 & 0.5 & 96 [80, 99] \\
+seller service, communication & 13.9 & 12.0 & 16.3 & 17.5 & 80 [61, 91] \\
+refund, cancel, return & 14.2 & 14.8 & 7.4 & 24.5 & 96 [80, 99] \\
+no topic matched & 18.9 & 20.2 & 17.0 & 17.5 & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Orders with several items or sellers.} On the 87{,}902 on-time,
+delivered and reviewed orders of the analysis window (Table~\ref{tab:basket}), a
+single item from one seller draws 1--2 stars 7.5\% of the time, two or more items
+from one seller 21.0\%, and two or more sellers 47.1\%. Multi-item orders are
+10.1\% of on-time orders but 27.1\% of their 1--2 star reviews, and 74.9\% and
+84.2\% of those reviewers who comment say that part of the order was wrong,
+missing or never came. Two limits: \code{n\_items} counts item rows, so two units
+of one product count as two; and an order carries one delivery timestamp, so
+``on time'' does not mean that every package arrived. The finding is an
+association, not a mechanism.
+
+\begin{table}[htbp]
+\centering
+\caption{On-time, delivered and reviewed orders of the analysis window by
+basket, from \code{customer\_basket.csv}: the 1--2 star rate with its 95\% Wilson
+interval, the basket's share of all on-time 1--2 star reviews, and what the
+reviewers who commented wrote (the topics of Table~\ref{tab:topics}; the first
+combines ``wrong or missing item'' and ``not received'').}
+\label{tab:basket}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}p{6.6cm}rrrr@{}}
+\toprule
+ & \textbf{1 item,} & \textbf{2+ items,} & & \textbf{all} \\
+ & \textbf{1 seller} & \textbf{1 seller} & \textbf{2+ sellers} & \textbf{on time} \\
+\midrule
+Orders & 79{,}011 & 7{,}650 & 1{,}241 & 87{,}902 \\
+\quad share of on-time orders & 89.9\% & 8.7\% & 1.4\% & 100.0\% \\
+Rated 1--2 stars & 7.5\% & 21.0\% & 47.1\% & 9.2\% \\
+\quad 95\% interval & [7.3, 7.6] & [20.1, 21.9] & [44.4, 49.9] & [9.0, 9.4] \\
+\quad share of all on-time 1--2 star reviews & 72.9\% & 19.9\% & 7.2\% & 100.0\% \\
+1--2 star reviews with a comment & 4{,}482 & 1{,}403 & 500 & 6{,}385 \\
+\quad say part of the order was wrong, missing or never came & 33.0\% & 74.9\% & 84.2\% & 46.2\% \\
+\quad say it was defective or damaged & 19.3\% & 5.5\% & 2.4\% & 15.0\% \\
+\quad say its quality was poor or not as described & 21.7\% & 7.0\% & 2.4\% & 16.9\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Do let-down customers come back less?} Each customer
+(\code{customer\_\allowbreak unique\_\allowbreak id}) is followed from their first
+order. A repeat is another order
+placed after the first was delivered and within the horizon of that delivery;
+the window must close by 22 August 2018, after which the extract thins out
+(\code{customer\_repeat.csv}, Table~\ref{tab:repeat}). Of the 50{,}360 first-time
+buyers that leaves at 180 days, 1.84\% came back. After a late first parcel
+1.44\% did, against 1.86\% after an on-time one; after a 1--2 star first review
+1.50\%, against 1.90\% after 4--5 stars. The direction is the same at every
+horizon, and some differences are nominally significant (after a 1--2 star review
+at 90 days, $-0.36$ points, $p = 0.003$), but they are tenths of a point on
+repeat rates of 0.56\% to 3.21\%, close to the smallest difference this sample
+can detect, and 28 comparisons were run over four horizons and two definitions
+of a repeat.
+They are exploratory. A bad experience therefore cannot be priced through the
+customer's own return, which is why the R\$40 of Section~\ref{sec:cost} is an
+assumption standing for the rating's effect on later buyers.
+
+\begin{table}[htbp]
+\centering
+\caption{Repeat purchase by the first order's experience, from
+\code{customer\_repeat.csv}: first-time buyers whose first order was delivered
+at least the horizon before 22 August 2018; a repeat is an order placed after
+that delivery and within the horizon. Rates in \% (``all'': every buyer of the
+cohort); the difference is in percentage points with a 95\% Newcombe interval;
+the odds ratio is Mantel--Haenszel, stratified by customer region and purchase
+quarter, with its 95\% interval. The other definition (any later order on a later
+day, counted from purchase) is in the CSV.}
+\label{tab:repeat}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrll@{}}
+\toprule
+ & \textbf{days} & \textbf{buyers} & \textbf{all} & \textbf{group vs reference} &
+\textbf{difference} & \textbf{odds ratio} \\
+\midrule
+\multicolumn{7}{@{}l}{\textit{First parcel late, against on time}} \\
+ & 30 & 82{,}422 & 0.56 & 0.41 vs 0.57 & $-$0.16 [$-$0.30, $+$0.03] & 0.79 [0.53, 1.18] \\
+ & 90 & 72{,}007 & 1.16 & 0.86 vs 1.19 & $-$0.33 [$-$0.55, $-$0.05] & 0.79 [0.59, 1.06] \\
+ & 180 & 50{,}360 & 1.84 & 1.44 vs 1.86 & $-$0.43 [$-$0.82, $+$0.08] & 0.83 [0.61, 1.13] \\
+ & 365 & 18{,}546 & 3.21 & 2.06 vs 3.26 & $-$1.20 [$-$2.07, $+$0.20] & 0.64 [0.37, 1.09] \\
+\multicolumn{7}{@{}l}{\textit{First review 1--2 stars, against 4--5 stars}} \\
+ & 30 & 82{,}422 & 0.56 & 0.42 vs 0.59 & $-$0.17 [$-$0.29, $-$0.02] & 0.75 [0.55, 1.02] \\
+ & 90 & 72{,}007 & 1.16 & 0.88 vs 1.23 & $-$0.36 [$-$0.55, $-$0.13] & 0.74 [0.59, 0.93] \\
+ & 180 & 50{,}360 & 1.84 & 1.50 vs 1.90 & $-$0.40 [$-$0.71, $-$0.03] & 0.81 [0.65, 1.01] \\
+ & 365 & 18{,}546 & 3.21 & 2.87 vs 3.33 & $-$0.46 [$-$1.18, $+$0.43] & 0.86 [0.65, 1.14] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{The value of a contact under other assumptions.} Table~\ref{tab:value}
+restates each list in reais per 1{,}000 reviewed test orders (12{,}855) at the
+assumed R\$5 a contact and R\$40 a 1--2 star rating, for three shares of the
+reached customers a contact turns around: all, half and a quarter. Nothing in
+the data measures that share. \code{customer\_value\_sensitivity.csv} also varies
+the contact cost (R\$2.5, 5, 10) and the rating's value (R\$20, 40, 80); only
+the share times that value counts, so the ``half'' column is also every reached
+customer turned around at R\$20 a rating. Read the other way, at R\$5 a contact
+the promised-date message pays at full effect if a 1--2 star rating is worth at
+least R\$9.1, the delivery-day call R\$19.2 (R\$36.5 and R\$76.9 at one in four;
+\code{customer\_value.csv}). The
+first panel counts every hit, as the slides did, including customers who had
+already rated the order or whose order never came; the second counts only the
+customers each contact could still reach at its own moment. The two contacts
+Section~\ref{sec:stakeholders} recommends are the last two rows.
+
+\begin{table}[htbp]
+\centering
+\caption{Net value per 1{,}000 reviewed test orders at the assumed R\$5 : R\$40,
+by the share of reached 1--2 star customers a contact turns around, from
+\code{customer\_value.csv}. Hits: listed customers who went on to rate the order
+1--2 stars. ``Must turn around'': the break-even share; above 100\% the contact
+cannot pay even if it turns every reached customer around.}
+\label{tab:value}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+ & & & & \multicolumn{3}{c}{\textbf{share turned around}} & \textbf{must turn} \\
+\cmidrule(lr){5-7}
+\textbf{List} & \textbf{listed} & \textbf{hits} & \textbf{precision} & \textbf{all} & \textbf{half} & \textbf{a quarter} & \textbf{around} \\
+\midrule
+\multicolumn{8}{@{}l}{\textit{Every hit counted, as on the slides}} \\
+Slides: threshold 0.11 & 1{,}927 & 712 & 0.369 & 1{,}466 & 358 & $-$196 & 33.8\% \\
+Slides: ten a day by purchase day & 614 & 351 & 0.572 & 853 & 307 & 34 & 21.9\% \\
+Deployed threshold 0.19 & 981 & 564 & 0.575 & 1{,}373 & 496 & 57 & 21.7\% \\
+\midrule
+\multicolumn{8}{@{}l}{\textit{Only customers the contact can still reach at its moment}} \\
+Threshold 0.11, call at delivery & 1{,}927 & 282 & 0.146 & 128 & $-$311 & $-$530 & 85.4\% \\
+Slides' ten a day, call at delivery & 614 & 54 & 0.088 & $-$71 & $-$155 & $-$197 & 142.1\% \\
+Threshold 0.19, call at delivery & 981 & 137 & 0.140 & 45 & $-$168 & $-$275 & 89.5\% \\
+Promised-date message & 804 & 440 & 0.547 & 1{,}056 & 372 & 30 & 22.8\% \\
+Delivery-day call, ten a day & 546 & 142 & 0.260 & 229 & 9 & $-$102 & 48.1\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:decomp} splits the figures quoted on the slides by whom a contact
+would have reached. Of the slides' threshold-0.11 list, R\$877 per 1{,}000 of
+gross value comes from delivered customers who had not yet written, R\$647 from
+orders that never arrived and R\$691 from late parcels already rated while the
+customer waited, against R\$750 of contacts: 60.4\% of the gross value is
+customers whose order never came or who rated a late parcel before it arrived. A call at delivery alone nets
+R\$128 on that list and $-$R\$71 on the ten-a-day list.
+
+\begin{table}[htbp]
+\centering
+\caption{Where the slides' values come from, per 1{,}000 reviewed test orders at
+the assumed R\$5 : R\$40 with every contact counted as turning its customer
+around, from \code{customer\_value\_decomposition.csv}. ``Not written'': the hits
+who had not rated the order before the parcel arrived, plus every hit whose
+order never arrived, whenever they rated (the slides' R\$775 and R\$433).}
+\label{tab:decomp}
+\footnotesize
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+ & \textbf{threshold 0.11} & \textbf{threshold 0.19} & \textbf{ten a day} \\
+ & \textbf{(slides)} & \textbf{(deployed)} & \textbf{(slides)} \\
+\midrule
+Customers listed & 1{,}927 & 981 & 614 \\
+Hits: delivered, not yet written & 282 & 137 & 54 \\
+\quad never delivered & 208 & 208 & 162 \\
+\quad late, written before arrival & 222 & 219 & 135 \\
+\midrule
+Gross R\$: delivered, not yet written & 877 & 426 & 168 \\
+\quad never delivered & 647 & 647 & 504 \\
+\quad late, written before arrival & 691 & 681 & 420 \\
+Contacts at R\$5 & $-$750 & $-$382 & $-$239 \\
+\midrule
+Net, every hit counted & 1{,}466 & 1{,}373 & 853 \\
+Net, not written before arrival & 775 & 692 & 433 \\
+Net, a call at delivery alone & 128 & 45 & $-$71 \\
+Gross share: undelivered or written first & 60.4\% & 75.7\% & 84.6\% \\
+\bottomrule
+\end{tabular}
+\end{table}

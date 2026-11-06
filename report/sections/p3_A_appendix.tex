@@ -1,16 +1,22 @@
 \section{Reproducing this report}
 \label{app:repro}
 
-\begin{table}[htbp]
-\centering
+{\small
+\begin{longtable}{@{}p{5.4cm}p{9.4cm}@{}}
 \caption{Everything in this document is generated. The order below is the order
 to run it in. The fitting step dominates; the rest takes a few minutes.}
-\label{tab:repro}
-\small
-\begin{tabular}{@{}p{5.4cm}p{9.4cm}@{}}
+\label{tab:repro}\\
 \toprule
 \textbf{Command} & \textbf{What it produces} \\
 \midrule
+\endfirsthead
+\multicolumn{2}{@{}l@{}}{\textit{Table~\ref{tab:repro}, continued}} \\
+\toprule
+\textbf{Command} & \textbf{What it produces} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
 \code{pip install -r requirements-dev.txt} & The full analysis environment.
 \code{requirements.txt} alone is the deployment runtime \\[3pt]
 \code{python tests/test\_leakage.py} & \checkcount{} validation checks: join
@@ -19,7 +25,10 @@ guard in both directions, split disjointness, Phase 1 backward compatibility,
 the capacity and lateness tables against recomputation, and --- added in this
 phase --- that the pickled models, the metadata, the hyperparameter table, the
 README and this report name the same deployed estimators, and that the
-review-timing value recomputes from the per-order predictions \\[3pt]
+review-timing value recomputes from the per-order predictions; since the
+presentation, that the customer-view tables and the slide sources agree with
+each other and with the earlier tables, and that the slides are byte-identical
+to the deck locked on 4 November \\[3pt]
 \code{python src/train\_models.py} & Fits every model, scores the test window
 once, writes \code{models/} and every result table into \code{report/results/} \\[3pt]
 \code{python src/capacity\_metrics.py} & Precision@$K$ and Recall@$K$ from the
@@ -33,12 +42,22 @@ training, validation and test periods (Appendix~\ref{app:tvt}) \\[3pt]
 out-of-sample window with its fold-to-fold spread (Appendix~\ref{app:protocol}),
 and the selected hyperparameters of every searched model and of the deployed
 ensembles' members, read from the pickles (Appendix~\ref{app:hyperparameters}) \\[3pt]
-\code{python src/pilot\_design.py} & The sizing of the outreach pilot
-(Section~\ref{sec:pilot}, Appendix~\ref{app:pilot}) \\[3pt]
+\code{python src/pilot\_design.py} & The sizing of the pilot as designed on
+slide 11 (Appendix~\ref{app:pilot}) \\[3pt]
 \code{python src/review\_timing.py} & When each review was written against the
-delivery, the share of the call list that can still be reached, the value
-restated on that share, and the per-order flags the application's replay shows
+delivery, the share of the list not yet written, the value restated on that
+share, and the per-order flags the application's replay shows
 (Appendix~\ref{app:timing}) \\[3pt]
+\code{python src/customer\_view.py} & The customer's view
+(Appendix~\ref{app:customer}, Section~\ref{sec:insight}): the promised date
+under each rule, what happened to every 1{,}000 orders, complaint topics,
+baskets, repeat purchase, every contact list with its value, the per-contact
+pilot sizes (Table~\ref{tab:pilot-arms}), the order of Box~1 and the per-order
+journeys the application shows. The deployed lead-time model is re-scored, not
+refitted, and its scores are asserted equal to the saved predictions \\[3pt]
+\code{python src/slide\_provenance.py} & Every number on the presentation slides
+recomputed from these tables, with its kind and source
+(Appendix~\ref{app:provenance}); it stops if any no longer matches its slide \\[3pt]
 \code{python src/figures\_phase2.py} & Draws every modelling figure as vector
 PDF into \code{report/figures/} from those tables; the exploratory figures are
 drawn by notebooks 01--04 \\[3pt]
@@ -51,14 +70,13 @@ the check that the later feature additions are backward compatible \\[3pt]
 \code{streamlit run deployment/app.py} & The application of
 Section~\ref{sec:deployment}; \code{dashboard/app.py} is the Community Cloud
 entry point and runs the same file \\
-\bottomrule
-\end{tabular}
-\end{table}
+\end{longtable}}
 
 Table~\ref{tab:repro} is the run order. \code{SEED = 42} is set in every
 estimator, every randomised search and every subsample. Both requirements files
-pin exact versions on Python $\le$ 3.12, the
-interpreter every reported number was produced on. Model artifacts record the
+pin exact versions that install on every Python up to 3.12; the reported numbers
+were produced on Python 3.10.9 with those pins, and the deployed application runs
+on Python 3.12. Model artifacts record the
 \code{scikit-learn} version that wrote them and \code{modeling.load\_model()}
 checks it on the way back in. The ten notebooks (01--04 exploratory, 05--09
 modelling, 10 the additions of this phase) are committed with their outputs.
@@ -133,10 +151,12 @@ Review keys &
 \code{review\_id} is not unique (789 ids reused); 547 orders carry 2--3 reviews
 and 768 carry none &
 Key on \code{order\_id}, keep the earliest review; no review means \code{NaN} \\[3pt]
-Sparse review text &
+Review text &
 \code{review\_comment\_title} present for 11.7\% of reviews,
-\code{review\_comment\_message} for 41.3\% &
-Use \code{review\_score} only; coverage does not support NLP features \\[3pt]
+\code{review\_comment\_message} for 41.3\%; 75.4\% of the analysis window's
+1--2 star reviews carry one or the other &
+Not a feature: a comment is written with the rating, after the prediction
+moment. Read descriptively (Appendix~\ref{app:customer}) \\[3pt]
 Geolocation grain &
 1{,}000{,}163 rows for 19{,}015 zip prefixes; 42 points lie outside Brazil and are dropped (19{,}010 prefixes kept) &
 Collapse to a median coordinate per prefix; use it for great-circle distance \\[3pt]
@@ -144,8 +164,8 @@ Missing product attributes &
 610 products (1.9\%) have no category &
 Label \code{unknown} rather than dropping orders; impute numerics in-pipeline \\[3pt]
 Coverage ramp &
-326 orders before 2017; final weeks truncated mid-cycle &
-Restrict to 2017-01-01 .. 2018-08-31 (99{,}091 orders) \\[3pt]
+329 orders before 2017; final weeks truncated mid-cycle &
+Restrict to orders placed 1 January 2017 to 30 August 2018 (99{,}091) \\[3pt]
 Portuguese categories &
 71 category names &
 Translate to English for all output; keep the original key \\
@@ -166,7 +186,7 @@ Translate to English for all output; keep the original key \\
 Derivable target & Yes, from order timestamps & Yes, \code{review\_score} $\le 2$ & Yes, next order by person \\
 No leakage & Yes, checkout regime & Yes, at-delivery regime & Yes, checkout regime \\
 Sufficient signal & Regression yes ($-41\%$ MAE); classification weak (1.6$\times$) & Yes, PR-AUC 0.40 vs 0.11 (3.6$\times$) & No, 2.0$\times$ at a 1.7\% base rate \\
-Manageable imbalance & 8.1\% late; PR-AUC and thresholds, no resampling & 14.6\% low; same handling & 2.6\%, too extreme \\
+Manageable imbalance & 8.1\% late; PR-AUC and thresholds, no resampling & 14.6\% low; same handling & 1.8\%, too extreme \\
 Clear stakeholder & Operations & Customer experience & CRM \\
 \midrule
 \textbf{Verdict} & \textbf{Problem 1} & \textbf{Problem 2} & Rejected \\
@@ -182,8 +202,9 @@ extract, with the observed rate given.}
 \label{tab:dictionary}
 \scriptsize
 \setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{0.96}
 \renewcommand{\code}[1]{\texttt{#1}}
-\begin{tabular}{@{}p{2.0cm}p{4.4cm}p{1.1cm}p{1.05cm}p{5.5cm}@{}}
+\begin{tabular}{@{}p{2.1cm}p{4.4cm}p{1.15cm}p{1.05cm}p{5.35cm}@{}}
 \toprule
 \textbf{Table} & \textbf{Column} & \textbf{Type} & \textbf{Null} & \textbf{Comment} \\
 \midrule
@@ -211,8 +232,8 @@ extract, with the observed rate given.}
 \code{order\_reviews} & \code{review\_id} & text & N & \textbf{Not unique} --- 789 ids reused across orders \\
  & \code{order\_id} & text & N & \textbf{1:N}; 547 orders carry 2--3 reviews \\
  & \code{review\_score} & int & N & 1--5; target of Problem 2 \\
- & \code{review\_comment\_title} & text & Y 88.3\% & Too sparse to use \\
- & \code{review\_comment\_message} & text & Y 58.7\% & Too sparse to use; no NLP features \\
+ & \code{review\_comment\_title} & text & Y 88.3\% & Written with the rating; not a feature \\
+ & \code{review\_comment\_message} & text & Y 58.7\% & Written with the rating; not a feature. Read descriptively (Appendix~\ref{app:customer}) \\
  & \code{review\_creation\_date} & date & N & Post-outcome for the review target \\
  & \code{review\_answer\_timestamp} & datetime & N & Post-outcome \\
 \midrule
@@ -228,7 +249,7 @@ extract, with the observed rate given.}
 \code{products} & \code{product\_id} & text & N & 32,951 products \\
  & \code{product\_category\_name} & text & Y 1.85\% & Portuguese; 73 values. Nulls labelled \emph{unknown} \\
  & \code{product\_weight\_g} & float & Y 0.01\% & Summed to order level \\
- & \code{product\_length/height/width\_cm} & float & Y 0.01\% & Combined into item volume \\
+ & \code{product\_length/\allowbreak height/\allowbreak width\_cm} & float & Y 0.01\% & Combined into item volume \\
  & \code{product\_photos\_qty} & float & Y 1.85\% & Listing-quality proxy \\
 \midrule
 \code{geolocation} & \code{geolocation\_zip\_code\_prefix} & int & N & 19,015 prefixes over 1,000,163 rows \\
@@ -254,7 +275,7 @@ derived & \code{hist\_*} & float & Y & The eight as-of track records of Section~
 \label{app:bands}
 
 Written into \code{config.EXPECTED\_BANDS} before any model was tuned.
-\code{evaluate.check\_bands()} compares the headline results against them at the
+\code{evaluate.\allowbreak check\_bands()} compares the headline results against them at the
 end of every training run and writes its verdicts to
 \code{report/results/bands.csv}. The alarm is direction-aware: for an error
 metric the suspicious end of the interval is the low one, for a score the high
@@ -282,6 +303,7 @@ leaks through.
 
 \begin{center}
 \scriptsize
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}llll@{}}
 \toprule
 \textbf{Family} & \textbf{Rung} & \textbf{Classification} & \textbf{Regression} \\
@@ -365,7 +387,7 @@ coefficients 0.405 (linear member) and 5.572 (tree member).}
 1B & DecisionTree & depth 9, min leaf 290, max features 0.878 \\
 1B & RandomForest & 150 trees, depth 13, min leaf 132, max features 0.300 \\
 1B & HistGradientBoosting & 426 iterations, learning rate 0.07079, 21 leaf nodes, min leaf 30, $\ell_2$ 8.244 \\
-1B & derived route $\dagger$ & one-parameter logistic on the margin, fitted on validation; threshold 0.11 \\
+1B & derived route $\dagger$ & two-parameter logistic on the margin, fitted on validation; threshold 0.11 \\
 \midrule
 2 & LogisticRegression ($\ell_2$) $\dagger$ & $C = 8.431$ \\
 2 & DecisionTree & depth 14, min leaf 211, max features 0.963 \\
@@ -462,8 +484,10 @@ written to \code{report/results/}:
 \code{capacity\_*.csv} & Precision@$K$ and Recall@$K$, pooled and per day, for both flags \\
 \code{lateness\_*.csv} & The lateness anatomy of Appendix~\ref{app:lateness} \\
 \code{train\_val\_test.csv} & The deployed models on the training, validation and test periods (Appendix~\ref{app:tvt}) \\
-\code{pilot\_design.csv}, \code{pilot\_breakeven.csv} & The outreach pilot sizing (Appendix~\ref{app:pilot}) \\
-\code{review\_timing*.csv}, \code{story\_order.csv} & Review timing against delivery, the reachable share of the call list, the restated value, the on-time check and the example order (Appendix~\ref{app:timing}) \\
+\code{pilot\_design.csv}, \code{pilot\_breakeven.csv} & The pilot as designed on slide 11 (Appendix~\ref{app:pilot}) \\
+\code{review\_timing*.csv}, \code{story\_order.csv} & Review timing against delivery, the share of the list not yet written, the restated value, the on-time check and the example order (Appendix~\ref{app:timing}) \\
+\code{customer\_*.csv} & The customer's view (Appendix~\ref{app:customer}): the promised date under each rule, by region and over a grid of margins; outcomes per 1{,}000 orders; the 1--2 star rate by days late; complaint topics, their patterns and precision, and the labelled sample behind it (\code{customer\_topic\_labels.csv}, a committed input rather than an output); baskets; repeat purchase; every contact list, its value, the value's decomposition and its sensitivity to the costs; the per-contact pilot sizes; the order of Box~1 and its timeline; the per-order journeys the application shows \\
+\code{slide\_provenance.csv} & Every number on the slides: kind, source or formula, recomputed value, whether it matches, and the reading this report stands by (Appendix~\ref{app:provenance}) \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -601,11 +625,11 @@ Bought 2--30 June                             & 5{,}912 & 1.4\%  & 6.6  & 27.5 \
 \end{table}
 
 \clearpage
-\section{Responses to the Phase 1 and Phase 2 feedback}
+\section{Responses to the Phase 1, Phase 2 and presentation feedback}
 \label{app:feedback}
 
-Both rounds of evaluator feedback were treated as specifications.
-Tables~\ref{tab:feedback1} and \ref{tab:feedback2} list each point and the
+Three rounds of feedback were treated as specifications.
+Tables~\ref{tab:feedback1} to \ref{tab:feedback3} list each point and the
 section, table or figure of this report that acts on it.
 
 \begin{center}
@@ -654,8 +678,9 @@ states alphabetically); growth is about eight-fold
 Sections~\ref{sec:eda} and \ref{sec:features} \\[2pt]
 Candidate 1 named a stakeholder without saying how the team would use the
 prediction &
-Table~\ref{tab:levers} and Section~\ref{sec:stakeholders}: four levers ordered
-by cost, each with its trigger and the evidence behind it \\[2pt]
+Table~\ref{tab:levers} and Section~\ref{sec:stakeholders}: at each moment of the
+customer's order, what the platform does, which team does it and the evidence
+behind it \\[2pt]
 Dashboard inaccessible &
 Redeployed from the team's current repository under a new URL;
 Section~\ref{sec:deployment} explains how it stays reachable \\
@@ -692,18 +717,87 @@ be in Appendix C but were not &
 Every figure in Appendix~\ref{app:figures} is referred to from the body; the
 selected values are in Table~\ref{tab:selected}, generated from the results
 tables and the deployed pickles \\[2pt]
-The expected benefit assumes that contacting a customer prevents the low
-review; state it as a limitation and propose a pilot or A/B test &
-Section~\ref{sec:limitations} states it; Section~\ref{sec:pilot},
-Appendix~\ref{app:pilot} and Figure~\ref{fig:pilot} design and size the
-randomised pilot; the model card carries a calculator for it.
-Appendix~\ref{app:timing} adds the part of the assumption the data \emph{can}
-check --- whether the customer has already written --- and restates the value
-on the reachable share \\
+The expected benefit assumes that contacting a customer changes the rating;
+state it as a limitation and propose a pilot or A/B test &
+Section~\ref{sec:limitations} states it; Section~\ref{sec:cost} gives the share
+of customers a contact must turn around to pay; Section~\ref{sec:pilot} and
+Table~\ref{tab:pilot-arms} size a randomised pilot for each contact on the customers
+it can still reach, and Appendix~\ref{app:pilot} compares the design on slide
+11; the model card carries a calculator for it. Appendix~\ref{app:timing} adds
+the part of the assumption the data \emph{can} check --- whether the customer
+has already written --- and restates the value on the share not yet written \\
 \bottomrule
 \end{tabular}
 \end{minipage}
 \end{center}
+
+{\small
+\setlength{\LTcapwidth}{\linewidth}
+\begin{longtable}{@{}p{4.4cm}p{10.1cm}@{}}
+\caption{Feedback on the presentation of 5 November 2026 and where this
+revised report acts on it. The slides are submitted unchanged, as the brief
+requires; Appendix~\ref{app:provenance} gives the source of each of their
+numbers and corrects their wording where it was wrong.}\label{tab:feedback3} \\
+\toprule
+\textbf{Feedback} & \textbf{Response} \\
+\midrule
+\endfirsthead
+\multicolumn{2}{@{}l}{\textit{Table~\ref{tab:feedback3}, continued}} \\
+\toprule
+\textbf{Feedback} & \textbf{Response} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+The presentation was framed around the company --- its teams, costs and reais
+--- more than around the customer &
+The report now starts from the customer and keeps Olist's teams as the ones who
+act. Section~\ref{sec:problem} opens with one customer's order (Box~1);
+Table~\ref{tab:levers} gives, at each moment of the order, what the customer
+needs, what the platform does and who does it; Section~\ref{sec:reviews} reports
+what unhappy customers wrote; Section~\ref{sec:stakeholders} states each
+recommendation by what changes for the customer, and Table~\ref{tab:customer}
+counts the customers each step reaches before any reais;
+Section~\ref{sec:limitations} states the risks to customers; and
+Appendix~\ref{app:customer} gives the tables behind them, including whether
+let-down customers came back. Money is kept, second, and its costs are labelled
+as assumptions (Section~\ref{sec:cost}) \\[2pt]
+One case, a single customer's order followed from checkout to review, was
+singled out as a strength &
+The order now opens the report as Box~1 in Section~\ref{sec:problem}, with every
+date read from the tables (\code{customer\_story.csv}) and when each
+recommendation would have reached that customer; the paragraph after the box
+and Appendix~\ref{app:timing} show from the test window that the case is typical
+rather than chosen for effect. The application now opens on the same order (its
+Customer journey tab, Figure~\ref{fig:app-journey}) \\[2pt]
+(Teaching assistant) Where do the numbers on slide 11 come from? &
+They are of four kinds the slide did not separate: observed on the held-out
+window (57.2\%, the 35 in 100); assumed, with no data source (R\$5 a contact,
+R\$40 a 1--2 star rating: Olist publishes no costs); derived by arithmetic on
+the two (R\$433 to R\$1{,}466, 44.7\%, about 1 in 5, +R\$0.72); and planned, for
+a pilot not yet run (the one-in-four effect, 42.9\%, 80\% power, 191 per arm,
+six weeks). Appendix~\ref{app:provenance} sources every number on every slide,
+recomputed by \code{src/slide\_provenance.py}: the values are per 1{,}000
+\emph{reviewed} orders; R\$775 belongs to the threshold-0.11 list, not to the
+35-in-100 share, which is worth R\$433; 57.2\% is a historical rate, not a
+control group; and the slide's statement about calls becomes ``the tables record
+no contact other than the survey''. Section~\ref{sec:cost} separates what is
+observed from what is assumed (Table~\ref{tab:cost}), Section~\ref{sec:pilot}
+re-sizes the pilot on the customers each contact can still reach
+(Table~\ref{tab:pilot-arms}), and Appendix~\ref{app:customer} varies the costs and the
+effect \\[2pt]
+The deck described its own dates, test and findings in moral terms, implying
+that the platform's promised dates could not be trusted &
+The report drops that vocabulary. It describes the platform's date neutrally,
+as a commercial decision padded against the cost of a broken promise
+(Section~\ref{sec:results-reg}; \citet{cui2024promise}), and replaces the
+slides' bare forecast with the forecast plus a margin chosen on validation, since
+the forecast on its own is exceeded by 31.9\% of deliveries
+(Section~\ref{sec:stakeholders}). Appendix~\ref{app:provenance} maps each phrase
+of the deck to the measured quantity behind it, and restates the rule that every
+customer is still asked for a review and no review is filtered, delayed in
+publication or rewarded
+\end{longtable}}
 
 \section{Training, validation and test side by side}
 \label{app:tvt}
@@ -772,7 +866,7 @@ are built by \code{src/features.py} from the nine tables alone.
 {\footnotesize
 \renewcommand{\code}[1]{\texttt{#1}}
 \setlength{\tabcolsep}{3pt}
-\begin{longtable}{@{}p{3.3cm}p{3.9cm}p{6.6cm}p{1.2cm}@{}}
+\begin{longtable}{@{}p{3.3cm}p{3.9cm}p{6.45cm}p{1.35cm}@{}}
 \caption{The 36 features by group. ``Checkout'' features are admissible for
 both problems; ``delivery'' features only for Problem 2.}
 \label{tab:features} \\
@@ -780,6 +874,7 @@ both problems; ``delivery'' features only for Problem 2.}
 \textbf{Feature} & \textbf{Definition} & \textbf{Why it is in the model} & \textbf{Known at} \\
 \midrule
 \endfirsthead
+\multicolumn{4}{@{}l}{\textit{Table~\ref{tab:features}, continued}} \\
 \toprule
 \textbf{Feature} & \textbf{Definition} & \textbf{Why it is in the model} & \textbf{Known at} \\
 \midrule
@@ -818,20 +913,95 @@ both problems; ``delivery'' features only for Problem 2.}
 \code{hist\_category\_\allowbreak low\_review\_rate} & the category's past 1--2 star rate & categories differ in how often they disappoint; encoded without seeing the future & checkout \\
 \code{hist\_platform\_\allowbreak lead\_days}, \code{hist\_platform\_\allowbreak late\_rate} & platform-wide trailing 28-day mean lead time and late rate & the drift tracker: tells the model how fast the network is running right now \citep{gama2014drift} & checkout \\
 \multicolumn{4}{@{}l}{\textit{Delivery outcome (3), Problem 2 only}} \\
-\code{delivery\_days}, \code{delay\_vs\_\allowbreak estimate\_days}, \code{is\_late} & realised lead time; days late against the promise; late flag & the dominant driver of a 1--2 star review, 9.2\% to 54.0\% (Section~\ref{sec:reviews}; \citealt{deshpande2023logistics}); known once the parcel has arrived and forbidden before & delivery \\
+\code{delivery\_days}, \code{delay\_vs\_\allowbreak estimate\_days}, \code{is\_late} & realised lead time; days late against the promise; late flag & the dominant driver of a 1--2 star review, 9.2\% to 54.0\% (Section~\ref{sec:reviews}; \citet{deshpande2023logistics}); known once the parcel has arrived and forbidden before & delivery \\
 \end{longtable}}
 
-\section{The outreach pilot}
+\section{The pilot, per contact and as designed on slide 11}
 \label{app:pilot}
+
+Section~\ref{sec:pilot} sizes one randomised arm for each contact, on the
+customers that contact can still reach (Table~\ref{tab:pilot-arms}, from
+\code{report/results/customer\_pilot\_arms.csv}). Every arm uses a two-sided
+two-proportion test at $\alpha = 0.05$ (\code{pilot\_design.n\_per\_arm}); the
+duration is the number of weeks the eligible customers take to fill every arm.
+The control rate is the share of those customers who went on to rate the order
+1--2 stars on the test window. It is a historical rate, not a measured control
+group: the tables record no contact other than the survey.
 
 \begin{table}[htbp]
 \centering
-\caption{Pilot size by assumed effect, from \code{report/results/pilot\_design.csv}.
-The control-arm rate is the model's precision at that daily capacity on the
-test window; $n$ is orders per arm for a two-sided two-proportion test at
-$\alpha = 0.05$; duration assumes $K$ contacts a day split evenly across the
-arms; net benefit per contact is under the R\$5 : R\$40 assumption.
-Figure~\ref{fig:pilot}.}
+\caption{Pilot size per contact, from \code{customer\_pilot\_arms.csv}. Arm B
+randomises every customer whose promised day ends without a parcel and who has
+not yet rated the order; Arm A, each day's ten riskiest delivered parcels whose
+customer has not yet rated the order, five of them contacted; the design on
+slide 11, shown for comparison, each day's top ten of the purchase-day list over
+all reviewed orders, five called. A day: customers randomised a day. Control:
+the share who went on to rate the order 1--2 stars. Reduction: the relative
+reduction in that share the arm is sized to detect (target), beside the one at
+which the contact breaks even under the assumed R\$5 : R\$40. $n$: customers per
+arm.}
+\label{tab:pilot-arms}
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}p{4.3cm}rrrrrrrr@{}}
+\toprule
+ & & & \multicolumn{2}{c}{\textbf{reduction}} & &
+\multicolumn{2}{c}{\textbf{80\% power}} & \textbf{90\%} \\
+\cmidrule(lr){4-5}\cmidrule(lr){7-8}\cmidrule(l){9-9}
+\textbf{Arm} & \textbf{a day} & \textbf{control} & \textbf{target} &
+\textbf{break-even} & \textbf{treated} & \textbf{$n$/arm} & \textbf{weeks} &
+\textbf{weeks} \\
+\midrule
+\raggedright B: the promised-date message, against current practice & 13.0 &
+0.547 & 25\% & 22.8\% & 0.410 & 209 & 5 & 7 \tabularnewline[2pt]
+\raggedright B with a third arm: the message with the survey unchanged & 13.0 &
+0.547 & 25\% & 22.8\% & 0.410 & 209 & 7 & 10 \tabularnewline[2pt]
+\raggedright A: the delivery-day call, five of each day's ten & 10 & 0.260 &
+48.1\% & 48.1\% & 0.135 & 159 & 5 & 7 \tabularnewline[2pt]
+\raggedright A, sized for a one-in-four effect (reference) & 10 & 0.260 & 25\% &
+48.1\% & 0.195 & 652 & 19 & 25 \tabularnewline
+\midrule
+\raggedright Slide 11: the purchase-day top ten, five called & 10 & 0.572 & 25\%
+& 21.9\% & 0.429 & 191 & 6 & 8 \tabularnewline
+\bottomrule
+\end{tabular}
+\end{table}
+
+Arm B randomises every customer whose promised day ends without a parcel and
+who has not yet rated the order: 804 reviewed test orders over the 62 purchase
+days, about 13 a day, of whom 54.7\% went on to rate the order 1--2 stars. These
+figures count the customers who went on to rate the order; a live pilot would
+also randomise the few overdue customers who never rate, which lowers the
+control rate slightly and lengthens the pilot. At the
+assumed costs the message pays if it turns around 22.8\% of them, so the arm is
+sized for one in four; the optional third arm, the message with the survey
+unchanged, separates the message from the timing of the survey. Arm A lists
+each day's ten riskiest delivered parcels whose customer has not yet rated the
+order and contacts five. Its control rate of 0.260 means the call pays only if it
+turns around 48.1\% of those customers, so the arm is sized for that break-even
+effect: an effect large enough to pay shows in five weeks, while a one-in-four
+effect, which would not pay, needs 652 customers per arm and 19 weeks. Arm A's
+durations assume ten listed every day; on the test window the delivery-day list
+held 8.7 customers a day on average (ten on 50 of its 63 delivery days), which
+stretches the five weeks to six.
+
+Table~\ref{tab:pilot} is the design shown on slide 11: each day's top ten
+of the purchase-day list over all reviewed orders, five called and five held
+back. Its control rate of 0.572 mixes customers no delivery-day call can reach
+(26.4 in 100 never received the parcel and 22.0 had already rated a late one
+while waiting), so a call could change at most 8.8 points, below the 12.5-point
+break-even; Section~\ref{sec:pilot} therefore sizes each arm on the customers it
+can reach.
+
+\begin{table}[htbp]
+\centering
+\caption{The design shown on slide 11 (the purchase-day list over all reviewed
+orders), by assumed effect, from \code{report/results/pilot\_design.csv}. The
+control rate is the list's historical precision at that daily size on the test
+window, not a measured control group; $n$ is orders per arm for a two-sided
+two-proportion test at $\alpha = 0.05$; the duration assumes $K$ orders randomised
+a day (half contacted); net benefit per contact is under the assumed R\$5 :
+R\$40. Figure~\ref{fig:pilot}.}
 \label{tab:pilot}
 \scriptsize
 \setlength{\tabcolsep}{3pt}
@@ -854,17 +1024,16 @@ Figure~\ref{fig:pilot}.}
 \end{tabular}
 \end{table}
 
-The design randomises inside the top-$K$ list, so both arms share the same
-predicted risk and the comparison is a fair one. Two things follow from the
-table that a verbal recommendation would miss. The break-even effect grows with
-capacity --- 21.9\% at ten contacts a day, 28.4\% at twenty, 42.1\% at forty ---
-because precision falls as the list is worked deeper, so a contact lower down
-has less to prevent; a pilot should therefore run at the capacity that would
-actually be deployed. And the pilot is short at the effect sizes that matter:
-six weeks detects a one-in-four reduction at ten contacts a day, while an effect
-too small to pay for itself would take sixteen weeks to confirm, which is itself
-informative --- if the pilot has not found an effect in two months, the policy
-should not be scaled.
+The slide's design randomises inside the top-$K$ list, so both arms share the
+same predicted risk. Two of its properties carry over to the per-contact arms.
+The break-even effect grows with the size of the list --- 21.9\% at ten orders
+randomised a day, 28.4\% at twenty, 42.1\% at forty --- because precision falls
+as the list is worked deeper, so a contact lower down has less to turn around; a
+pilot should therefore run at the size that would be deployed. And the pilot is
+short at the effect sizes that matter: six weeks detects a one-in-four reduction
+at ten a day, while an effect too small to pay for itself would take sixteen
+weeks to confirm, which is itself informative --- if a pilot has not found an
+effect in two months, the contact should not be scaled.
 
 \section{When is the review written?}
 \label{app:timing}
@@ -874,10 +1043,10 @@ table carries two timestamps --- \code{review\_creation\_date}, the day the
 satisfaction survey was sent, and \code{review\_answer\_timestamp}, the moment
 the customer answered --- and comparing the second with the delivery timestamp
 tests that framing (\code{src/review\_timing.py}). It holds for parcels that
-arrive on time and fails for most late ones. The survey goes out at delivery or,
-for a parcel still on the road, once the promised date has passed, so the
-customer of a late parcel is usually asked to review while still waiting
-(Table~\ref{tab:timing}).
+arrive on time and fails for most late ones. The timestamps show the survey
+going out around delivery or, for a parcel still on the road, after the promised
+date has passed (the rule itself is not recorded), so the customer of a late
+parcel is usually asked to review while still waiting (Table~\ref{tab:timing}).
 
 \begin{table}[htbp]
 \centering
@@ -900,17 +1069,28 @@ Median answer of a 1--2 star review, days after delivery & $-$4.5 & 2.1 \\
 \end{tabular}
 \end{table}
 
+The 87.3\% is the analysis window's figure. On the test window it is 77.4\% of
+the 287 late parcels rated 1--2 stars (\code{customer\_survey\_timing.csv}). The
+order of Box~1 (Section~\ref{sec:problem}) shows the pattern in one case, and it
+is typical: for 71.4\% of those 287 customers the survey went out exactly two
+days after the promised date, and none of their reviews was answered during the
+promised day itself, so a message when that day ends would have come before
+every one of them. Over the analysis window the same two figures are 68.5\% of
+4{,}136 and 99.6\% (the rest were answered before the promised date).
+
 \begin{table}[htbp]
 \centering
 \caption{The review-risk list on the test window, its hits split into customers
-who had not yet written (reachable) and those who already had, from
+who had not yet rated the order when the parcel arrived (with every hit whose
+order never arrived, whenever they rated) and those who already had, from
 \code{report/results/review\_timing\_capacity.csv}. Precision is the share of
-contacts that reach a 1--2 star reviewer; the two columns after it sum to it.}
+listed customers who went on to rate the order 1--2 stars; the two columns after
+it sum to it. Late share: the share of the list whose parcel was late.}
 \label{tab:timing-capacity}
 \small
 \begin{tabular}{@{}lrrrr@{}}
 \toprule
-\textbf{Capacity} & \textbf{precision} & \textbf{reachable} & \textbf{already written} & \textbf{late share of contacts} \\
+\textbf{Capacity} & \textbf{precision} & \textbf{not yet written} & \textbf{already written} & \textbf{late share} \\
 \midrule
 top 1\%  & 0.705 & 0.419 & 0.287 & 0.403 \\
 top 5\%  & 0.678 & 0.362 & 0.316 & 0.521 \\
@@ -924,52 +1104,98 @@ contacting at random & 0.110 & 0.093 & 0.017 & --- \\
 \end{tabular}
 \end{table}
 
-Two consequences follow. \textbf{A hit is not always a review that can still be
-prevented.} At ten contacts a day, 0.572 of contacts reach a would-be low
-reviewer, but 0.220 reach one who has already written --- almost always on a late
-parcel --- and 0.352 one who has not, against 0.093 at random
-(Table~\ref{tab:timing-capacity}). Counting only the reachable, the expected
-benefit under R\$5 : R\$40 falls from R\$1{,}466 to \textbf{R\$775 per thousand
-delivered orders} at the same optimum (threshold 0.11), and at ten contacts a
-day from R\$853 to R\$433. It stays positive: reachable precision is still almost
-three times the 0.125 break-even. \textbf{The action for a late parcel belongs on
-the promised date, not at delivery.} Customer care can reach the customer as the
-promise breaks, with an apology and a new date, and the survey can be sent after
-the parcel arrives. That contact needs no model, since the calendar identifies
-the parcels, and it is tested as the second arm of the pilot
+Two consequences follow. \textbf{Not everyone on the list can still be helped at
+delivery.} At ten a day, 0.572 of the listed customers went on to rate the order
+1--2 stars, but 0.220 had already rated it --- almost always while waiting for a
+late parcel --- and 0.352 had not, against 0.093 at random
+(Table~\ref{tab:timing-capacity}). Counting only those not yet written, the value
+under the assumed R\$5 : R\$40 falls from R\$1{,}466 to R\$775 per 1{,}000
+reviewed orders at the same threshold, 0.11, and at ten a day from R\$853 to
+R\$433; both figures still count every contact as turning its customer around,
+and both include orders that never arrived (below). Capacity changes how the
+optimum is used rather than where it is: a team that can work only 5\% of
+reviewed orders still captures R\$1{,}107 of those R\$1{,}466 per 1{,}000
+(Table~\ref{tab:capacity}), because the top of the list is where the precision
+is.
+\textbf{The action for a late parcel belongs on the promised date, not at
+delivery.} Customer care can reach the customer when the promised day ends
+without a parcel, with an apology, the parcel's status and a new date, and the
+survey can follow once the order is complete; every customer is still asked, and
+no review is filtered, delayed in publication or rewarded. That contact needs no
+model, since the calendar identifies the customers, and it is Arm~B of the pilot
 (Section~\ref{sec:pilot}). The review-risk list keeps its value for the parcels
-that arrive on time, which produce two thirds of all low reviews and are reviewed
-a median 2.1 days after delivery. On those parcels alone --- delivered on time,
-11{,}654 orders at a 7.9\% base rate --- the deployed model still ranks usefully,
-if less sharply: ROC-AUC 0.651, and its top 5\% are 28.0\% low reviewers, 3.5
-times their base rate; on all delivered parcels (12{,}571, base rate 9.6\%) the
-top 5\% are 53.9\% low reviewers, 5.6 times the base rate
+that arrive on time, which produce two thirds of all 1--2 star reviews and are
+reviewed a median 2.1 days after delivery. On those parcels alone --- delivered
+on time, 11{,}654 test orders at a 7.9\% base rate --- the deployed model still
+ranks usefully, if less sharply: ROC-AUC 0.651, and 28.0\% of its top 5\% went on
+to rate the order 1--2 stars, 3.5 times their base rate; on all delivered parcels
+(12{,}571, base rate 9.6\%) the top 5\% reach 53.9\%, 5.6 times the base rate
 (\code{review\_timing\_subsets.csv}).
+
+\paragraph{Who each contact can still reach.} Each customer who rated the order
+1--2 stars falls into one of four classes by the contacts that would still have
+come before the rating: a message when the promised day ended without a parcel
+(the customer still waiting, and not yet rated then), a call at delivery (the
+parcel delivered and not yet rated), either, or neither. Of the 1{,}418
+test-window customers who rated 1--2 stars, 945 could have been reached only by a
+call at delivery, 398 only by the promised-date message, 42 by either and 33 by
+neither (\code{customer\_outcomes\_test.csv}). Table~\ref{tab:reach} splits each
+list's hits the same way. Most of the slides' hits are customers no call at
+delivery could help. The list a team would actually work --- each morning, the
+previous day's deliveries whose customer has not yet rated the order --- reaches
+26 in 100, 3.2 times its 8.1\% base rate, every one of them still reachable, and
+the promised-date message reaches 55 in 100 with no model at all.
+
+\begin{table}[htbp]
+\centering
+\caption{Who each list reaches on the test window, from
+\code{customer\_contact\_lists.csv}. Hits are listed customers who went on to rate
+the order 1--2 stars, split by the contact that could still have come before the
+rating: only the promised-date message, only a call at delivery, either, or
+neither. A day: listed customers per day of the window. Random: the 1--2 star
+rate of the population the list is drawn from (the message contacts all of its
+population, so it has none). The first row is every customer of the test window
+who rated 1--2 stars (\code{customer\_outcomes\_test.csv}).}
+\label{tab:reach}
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}p{4.3cm}rrrrrrrr@{}}
+\toprule
+ & & & & & \multicolumn{4}{c}{\textbf{hits reachable by}} \\
+\cmidrule(l){6-9}
+\textbf{List} & \textbf{listed} & \textbf{a day} & \textbf{precision} &
+\textbf{random} & \textbf{message} & \textbf{call} & \textbf{either} &
+\textbf{neither} \\
+\midrule
+All who rated 1--2 stars & --- & --- & --- & --- & 398 & 945 & 42 & 33 \\
+\midrule
+Slides: ten a day, by purchase day & 614 & 9.9 & 0.572 & 0.110 & 265 & 48 & 6 & 32 \\
+Slides: threshold 0.11 & 1{,}927 & 31.1 & 0.369 & 0.110 & 398 & 245 & 37 & 32 \\
+Deployed threshold 0.19 & 981 & 15.8 & 0.575 & 0.110 & 395 & 107 & 30 & 32 \\
+Delivery-day list, ten a day & 546 & 8.7 & 0.260 & 0.081 & 0 & 118 & 24 & 0 \\
+Promised-date message (no model) & 804 & 13.0 & 0.547 & --- & 398 & 0 & 42 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \paragraph{Orders that never arrived.} The Problem~2 population is every reviewed
 test order, and 284 of the 12{,}855 (2.2\%) were never delivered within the
 extract: 122 cancelled, 98 still \emph{shipped}, 36 invoiced, 24 unavailable and
 4 other. Their delivery fields are missing, which the model reads as a strong
-signal --- 73.2\% of them left a 1--2 star review --- and they make up 37\% of
-the daily top-ten picks. Of the 57 hits per 100 calls at ten a day, 26 are such
-orders, 22 are late parcels whose review was written before arrival, and 9 are
-delivered parcels whose customer had not yet written
+signal --- 73.2\% of their customers rated the order 1--2 stars --- and they make
+up 37\% of the daily top-ten picks. Of the 57 hits per 100 listed at ten a day,
+26 are such orders, 22 are late parcels whose review was written before arrival,
+and 9 are delivered parcels whose customer had not yet written
 (\code{review\_timing\_composition.csv}). A delivery-day call cannot reach the
-first two groups; they are the case for the promised-date contact of
-Section~\ref{sec:stakeholders}, which an order that misses its date triggers
-whether or not it ever arrives. Restricted to delivered parcels, the daily
-top-ten list reaches a would-be low reviewer 45 times per 100 calls (29 already
-written, 16 still reachable) against a 9.6\% base rate, and on 16 July it finds
-six of its ten. Table~\ref{tab:timing-capacity} and the values above count the
-never-delivered hits as reachable; they should be read with that in mind.
-
-The order that opens the presentation shows the pattern in one case. Bought on 16
-July 2018 in São Gonçalo (RJ) from a seller in São Luís (MA), 2{,}267\,km away,
-and promised in 21 days, it was surveyed two days after the promise passed and
-rated one star 5.8 days before it arrived, 10.5 days late. It tops the 16 July
-review-risk list at 0.85; eight of that day's top ten left a 1--2 star review:
-four wrote before their late parcel arrived, and four never received it
-(\code{story\_order.csv}).
+first two groups. Of their 297 customers, 265 had not yet rated the order when
+their promised day ended (Table~\ref{tab:reach}): they are the customers of the
+promised-date message of Section~\ref{sec:stakeholders}, which an order that
+misses its date triggers whether or not it ever arrives. Restricted to delivered parcels, the purchase-day
+top-ten list reaches a customer who went on to rate the order 1--2 stars 45 times
+per 100 listed (29 already written, 16 still reachable) against a 9.6\% base
+rate, and on 16 July it finds six of its ten. Table~\ref{tab:timing-capacity} and
+the values above count the never-delivered hits as not yet written; they should
+be read with that in mind.
 
 \section{Contributions}
 \label{app:contributions}
@@ -997,5 +1223,8 @@ Sections~\ref{sec:data}, \ref{sec:eda}, \ref{sec:results-reg},
 \end{tabular}
 \end{center}
 
-All three members reviewed every section and verified the reported numbers
-against \code{report/stats\_phase3.txt} and \code{report/stats.txt}.
+All three members reviewed every section of the report as first submitted and
+verified the reported numbers against \code{report/stats\_phase3.txt} and
+\code{report/stats.txt}; the numbers the revision adds are checked by the
+assertions in the scripts that write them and by the test suite
+(Appendix~\ref{app:repro}).

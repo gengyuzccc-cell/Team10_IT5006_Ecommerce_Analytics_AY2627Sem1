@@ -1,79 +1,122 @@
 \section{Problem Definition and Stakeholder Context}
 \label{sec:problem}
 
-\subsection{Two problems, one decision chain}
+\subsection{The customer's promise, and two moments to keep it}
 
-The exploratory analysis of Section~\ref{sec:eda} left one finding standing
-above the rest: a late delivery raises the probability of a 1--2 star review
-from 9.2\% to 54.0\%, a 5.9-fold increase monotone in how late the parcel is.
-The project turns that sentence into a pair of predictions placed at two points
-in an order's life (Table~\ref{tab:problems}).
+\par\smallskip\noindent
+\fcolorbox{black!35}{black!3}{%
+\begin{minipage}{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}
+\footnotesize
+\textbf{Box 1. One customer's order} \hfill order \code{e1320973};
+\code{report/results/customer\_story.csv}\par\smallskip
+\textbf{16 July 2018.} A customer in S\~{a}o Gon\c{c}alo (RJ) buys a R\$64.99
+health-and-beauty item (R\$27.74 freight) from a seller 2{,}267\,km away in
+S\~{a}o Lu\'{\i}s (MA), and is shown a delivery date of 7 August, 21 days away.
+The deployed models expect 18.0 days and put the risk of missing the date at
+18\%, 23rd of the 238 delivered orders placed that day.
+\textbf{20 July.} The seller's shipping deadline passes; the carrier receives the
+parcel on 1 August.
+\textbf{7 August.} The promised date passes; the tables record no message to the
+customer. \textbf{9 August.} The satisfaction survey is sent.
+\textbf{11 August.} One star, titled \emph{Bom} (``good''), with the comment
+\emph{N\~{a}o veio a embalagem certa} (``the right packaging did not come'';
+ambiguous). \textbf{17~August.} The parcel arrives 10.5 days late; the review is
+5.8 days old. Of the 244 reviewed orders placed on 16 July, this one tops the
+review-risk ranking (0.85).\par\smallskip
+\emph{Under the recommendations of Section~\ref{sec:stakeholders}}, checkout
+would have shown 12 August (also missed, by five days); a message would have
+reached the customer as 7 August ended, more than three days before the review,
+and a call at delivery 5.8 days after it. Eight of that day's top ten rated their
+order 1--2 stars --- four waiting for a late parcel, four whose order never
+came --- and all eight were without a parcel, and had not yet written, when their
+promised day ended. Whether a message would have helped them is what
+the pilot of Section~\ref{sec:pilot} measures.
+\end{minipage}}
+\par\smallskip
+
+Of every 1{,}000 orders placed in the test window, 905 arrived by the promised
+date, 72 after it and 23 never arrived; 110 customers rated their order 1--2
+stars, 71 of them with a parcel that came on time. Among late parcels later rated
+1--2 stars, Box~1 is typical: for 71\% the survey went out exactly two days after
+the promised date, and 77\% answered before the parcel arrived.
+The project turns this into two predictions at two moments of the customer's
+order (Table~\ref{tab:problems}), each owned by the team that can act on it.
 
 \begin{table}[htbp]
 \centering
 \caption{The two problems. They share one feature pipeline, one model-family
-budget and one dataset; what separates them is \emph{when} the model runs.}
+budget and one dataset; what separates them is \emph{when} in the customer's
+order the model runs.}
 \label{tab:problems}
 \footnotesize
-\begin{tabular}{@{}p{1.9cm}p{6.2cm}p{6.2cm}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{1.9cm}p{6.2cm}p{6.2cm}@{}}
 \toprule
  & \textbf{Problem 1 --- delivery performance} & \textbf{Problem 2 --- satisfaction risk} \\
 \midrule
-Question & How long will this order take, and will it miss its promise? &
-Will this delivered order draw a 1--2 star review? \\[2pt]
+Question & How long will this order take, and will it miss the date the customer
+is shown? & Will the customer rate this delivered order 1--2 stars? \\[2pt]
+Customer need & a date they can rely on & help while a problem can still be put
+right \\[2pt]
 Moment & \code{at\_checkout} --- the order has just been placed &
-\code{at\_delivery} --- the parcel has arrived, the review is not yet written \\[2pt]
-Stakeholder & Operations and logistics & Customer experience \\[2pt]
+\code{at\_delivery} --- the parcel has arrived; the customer has not yet rated it \\[2pt]
+Who acts & Operations and logistics & Customer experience \\[2pt]
 Task & \textbf{1A regression}: lead time in days, on MAE.
 \textbf{1B classification}: delivered after the promised date, on PR-AUC against
 its no-skill floor &
 \textbf{Classification}: \code{review\_score} $\le 2$, on PR-AUC against its
-floor and balanced accuracy \\[2pt]
-Action & Re-quote the promise, warn the buyer, expedite freight &
-Reach out before the review lands \\
+floor and balanced accuracy \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 The brief permits two problems or one framed twice; we take two, because they
 are halves of one decision chain: operations acts before the parcel ships,
-customer experience after it arrives and before the customer writes anything,
+customer experience after it arrives, while the customer can still be helped,
 and Problem 1's output is, in substance, Problem 2's most important input.
 Problem 1 is the brief's \emph{dual framing}: one underlying quantity, two
 outputs, so the late-order flag \emph{is} the regression's answer compared
 against the promised date; five classifiers trained directly on the binary
 label run alongside as a control arm (Section~\ref{sec:results-late}).
 
-\subsection{How the stakeholders act on the output}
+\subsection{Where in the customer's order the platform can act}
 \label{sec:levers}
 
 A prediction is only worth producing if someone changes a decision because of
 it --- the lesson of the prescriptive delivery framework reviewed in
-Section~\ref{sec:lit}, where the savings came from routing machine-learned
-delivery outcomes into a scheduling decision \citep{kandula2021prescriptive}.
-Table~\ref{tab:levers} states what each team does with each output and what
-decides whether the action pays, and it shapes the evaluation: the cheap
-operations levers apply to every order and are judged on the regression's
-accuracy; the expensive one, and all of customer experience's work, are rationed
-by capacity and are judged on what the top-$K$ of a ranked list delivers
-(Section~\ref{sec:results-capacity}).
+Section~\ref{sec:lit} \citep{kandula2021prescriptive}. Table~\ref{tab:levers}
+follows the customer's order: what the customer needs at each moment, what the
+platform does, who does it and the evidence. The date applies to every order and
+is judged on the regression's accuracy; the contacts are rationed by capacity
+and judged on the top of a ranked list (Section~\ref{sec:results-capacity}).
 
 \begin{table}[htbp]
 \centering
-\caption{What each team does with the predictions, and what decides whether
-the action pays. Costs are the stated assumptions of Section~\ref{sec:cost}.}
+\caption{The customer's order and where the platform can act. Costs are the
+assumptions of Section~\ref{sec:cost}; Table~\ref{tab:customer} counts the customers each
+step reaches.}
 \label{tab:levers}
 \footnotesize
-\begin{tabular}{@{}p{2.0cm}p{3.6cm}p{1.35cm}p{6.9cm}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{1.6cm}>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{5.0cm}>{\raggedright\arraybackslash}p{1.75cm}>{\raggedright\arraybackslash}p{3.1cm}@{}}
 \toprule
-\textbf{Who, when} & \textbf{Lever} & \textbf{Cost} & \textbf{Trigger, and the evidence behind it} \\
+\textbf{Moment} & \textbf{Customer need} & \textbf{What the platform does}
+& \textbf{Who acts} & \textbf{Evidence; cost} \\
 \midrule
-Operations, at checkout & Re-quote the promised date with the model's estimate & none & every order; MAE 3.90 days against the promise's 9.79 (Section~\ref{sec:results-reg}) \\[2pt]
- & Pre-warn the buyer & near zero & $p_{\text{late}} \ge 0.11$ catches 82.6\% of the orders that will miss \\[2pt]
- & Expedite freight & R\$12 & only where precision clears 0.30, which it never does (Section~\ref{sec:results-capacity}); manual review of the top of the list \\[2pt]
- & Monitor sellers, routes, carrier & analyst time & track-record features and the weekly late series (Figure~\ref{fig:lateness}) as early warning \\[2pt]
+Checkout & a date to rely on & quotes the forecast plus 8 days, chosen on
+validation & Operations & missed for 2.5\% of delivered orders, not 7.4\%; quoted
+wait +1.1\,d \\[2pt]
+Promised day ends, no parcel & to hear first & that day: apology, status, new
+date, or a refund; asks for the review once the order is complete & Customer
+care & calendar, no model; 55\% of those who rate later give 1--2 stars;
+R\$5 \\[2pt]
+Delivery & a fix if the parcel disappoints & contacts the top of each morning's
+ranking of deliveries not yet rated & Customer experience & 26 in 100 rate 1--2
+stars (3.2$\times$); R\$5 \\[2pt]
+Review & to rate what happened & asks every customer; never filters a review,
+delays its publication or rewards it & Platform & --- \\
 \midrule
-Customer experience, at delivery & Contact the customer before the review is written & R\$5 & the day's deliveries ranked by $p_{\text{low}}$, worked top-down to capacity $K$; at 5\% of deliveries, two contacts in three reach a would-be 1--2 star reviewer \\
+\multicolumn{5}{@{}p{\dimexpr\linewidth\relax}@{}}{\emph{Not recommended:}
+expediting freight on the checkout flag (R\$12): its precision peaks at 0.27,
+under the 0.30 it would need (Section~\ref{sec:results-capacity}).} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -84,8 +127,9 @@ All three targets come from the provided tables alone. \emph{Lead time} is the
 time from purchase (\code{order\_purchase\_\allowbreak timestamp}) to arrival
 (\code{order\_delivered\_\allowbreak customer\_date}), in days, defined for the
 97.0\% of orders that reached the customer. \emph{Late} is delivery strictly after
-\code{order\_estimated\_delivery\_date}, which carries no time component, so
-lateness is accurate to about a day. \emph{Low review} is \code{review\_score}
+\code{order\_estimated\_delivery\_date}, which carries no time component, so a
+parcel delivered during the promised day counts as late
+(Appendix~\ref{app:customer}). \emph{Low review} is \code{review\_score}
 $\le 2$, defined for the 99.2\% carrying a review. Undefined rows are \code{NaN}
 and excluded, never imputed to a negative label: the event has not happened
 rather than gone missing, and a silent customer is not a satisfied one.
@@ -101,7 +145,7 @@ star --- is the signature of acquisition and under-reporting biases
 \citep{hu2009jshaped, hu2017selfselection}; a rating also moves with the
 product, its price and the seller's communication
 \citep{dellarocas2003digitization}. Problem 2 therefore predicts the
-\emph{rating}, the observable the customer-experience team is measured on, and
+\emph{rating}, the customer's own recorded verdict, which later buyers read, and
 claims nothing about latent satisfaction; the consequence, that part of the
 residual is unobserved product and seller effects, is carried into
 Section~\ref{sec:limitations}.
@@ -110,14 +154,10 @@ Section~\ref{sec:limitations}.
 \label{sec:bands}
 
 Expected ranges for all six headline metrics were written into
-\code{config.EXPECTED\_BANDS} \emph{before} any model was tuned, from the
-Phase 1 results and untuned scoping probes (Appendix~\ref{app:bands}). They are
-the targets the work is judged against and they are a leak alarm: here the
-signature of leakage is not a subtle improvement but an implausible one
-(Section~\ref{sec:leakage}), so a result landing far \emph{above} its band is
-investigated before it is reported. All six landed inside; none above. The
-ceiling was stated as plainly as the target: the largest swings in lateness are
-shocks to carrier capacity and to the platform's own promising policy
-(Section~\ref{sec:eda-lateness}), none of which is an attribute of an order, so
-a late-delivery classifier reporting 95\% accuracy here would be the
-majority-class rule or a leak.
+\code{config.EXPECTED\_BANDS} before any model was tuned (Appendix~\ref{app:bands}).
+They are the models' targets and a leak alarm --- leakage shows as an implausible
+improvement --- and all six landed inside, none above; the customer measures are
+in Table~\ref{tab:customer}. The ceiling was stated as plainly: the largest swings in
+lateness are shocks to carrier capacity and to the platform's own promising
+(Section~\ref{sec:eda-lateness}), so a late-delivery classifier reporting 95\%
+accuracy here would be the majority-class rule or a leak.

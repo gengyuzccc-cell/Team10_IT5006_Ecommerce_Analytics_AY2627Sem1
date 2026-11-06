@@ -22,70 +22,63 @@ evaluates.}
 \toprule
 \textbf{Problem} & \textbf{Estimator served} & \textbf{Artifact} & \textbf{Decision rule} \\
 \midrule
-1A lead time & \code{VotingRegressor}: LinearRegression + HistGradientBoosting, weights 1:2 & 381\,KB & re-quote with the estimate \\[2pt]
+1A lead time & \code{VotingRegressor}: LinearRegression + HistGradientBoosting, weights 1:2 & 381\,KB & quote the estimate plus 8 days, rounded up to a calendar day \\[2pt]
 1B late flag & logistic map of (predicted $-$ promised days) to a probability & 1\,KB & flag at $p_{\text{late}} \ge 0.11$ \\[2pt]
-2 low review & \code{StackingClassifier}: $\ell_2$ LogisticRegression + HistGradientBoosting, logistic meta-learner & 321\,KB & flag at $p_{\text{low}} \ge 0.19$; rank for the top-$K$ \\
+2 low review & \code{StackingClassifier}: $\ell_2$ Logistic\-Regression + HistGradientBoosting, logistic meta-learner & 321\,KB & flag at $p_{\text{low}} \ge 0.19$; rank for the top-$K$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Nothing in the application reimplements the training-time feature engineering.
-A form submission or an uploaded row is turned back into an order frame and
-pushed through the same \code{src/features.py} builders the models were fitted
-on, which is what stops a feature being computed one way in training and
-another way in production \citep{sculley2015debt}. The one thing a form cannot
-supply is a seller's track record, so \code{models/history\_lookup.csv} carries
-those aggregates at each level of the same fallback chain the training code
-uses. The artifacts total under 1\,MB and record the \code{scikit-learn}
-version that wrote them; \code{requirements.txt} pins that version, the loader
-raises a visible warning if it ever drifts, and the app runs on Python 3.12,
-the interpreter the pinned numpy publishes wheels for. Models are loaded
-once per server process and cached, so no visitor pays for unpickling them
-twice.
+Nothing in the application reimplements the training-time feature engineering:
+a form submission or an uploaded row is pushed through the same
+\code{src/features.py} builders the models were fitted on, so no feature is
+computed one way in training and another in production \citep{sculley2015debt}.
+A seller's track record, which a form cannot supply, comes from
+\code{models/history\_lookup.csv} at each level of the training code's fallback
+chain. The artifacts total under 1\,MB, record the \code{scikit-learn} version
+that wrote them (pinned in \code{requirements.txt}; the loader warns if it
+drifts) and are loaded once per server process.
 
 \subsection{What the application does}
 
-The application has eight tabs (Figures~\ref{fig:app-predict} to
-\ref{fig:app-card}). Five are the exploratory analysis of Section~\ref{sec:eda}
-with sidebar filters. \textbf{Predict} scores a single order entered as it
-would look at checkout and returns the expected lead time with its typical
-error, the risk of missing the promised date against the tuned threshold, and,
-conditional on that forecast, the low-review risk; it also scores an uploaded
-CSV of up to 5{,}000 orders and builds the \textbf{triage list}: rows ranked by
-review risk with the top-$K$ marked for a capacity the user enters, and the
-precision and recall that capacity achieved on the held-out window beside it.
-\textbf{Replay a day} is new in this phase (Figure~\ref{fig:app-replay}): the
-user picks any purchase day in the test window and a daily capacity, sees what
-the deployed models predicted for every order placed that day, ranked the way
-the customer-experience team would work them, and a toggle reveals what
-actually happened --- which orders left a 1--2 star review, how long delivery
-really took --- with the precision of the top-$K$ on that day and on every
-other day of the window. For 16 July 2018 at ten contacts, eight of the ten
-would have reached a would-be low reviewer. \textbf{Model card} states what is
-deployed as read from the artifacts (Table~\ref{tab:deployed}), the training
-protocol, every searched model's selected hyperparameters, the fold-to-fold
-variation of every candidate, the Precision@$K$ table, the situations in which
-the models should not be trusted \citep{mitchell2019modelcards}, and a
-calculator for the pilot of Section~\ref{sec:pilot}. Every number it shows is
-read from the result tables this report quotes; the application recomputes
-nothing.
+The application has nine tabs (Figures~\ref{fig:app-journey} to
+\ref{fig:app-card}) and opens on the customer. \textbf{Customer journey} follows
+any reviewed test order --- by default the order of Box~1 --- from checkout to
+review: what the customer went through, what each deployed model said at that
+moment, which contact could still have reached them, and their own words. Five
+tabs are the exploratory analysis of Section~\ref{sec:eda}, four with filters.
+\textbf{Predict} (Figure~\ref{fig:app-predict}) scores an order entered as it
+would look at checkout --- the expected lead time with its typical error, the
+date the customer would be quoted (forecast plus the margin), the risk of
+missing the promise and the conditional low-review risk --- and turns an
+uploaded CSV of up to 5{,}000 orders into a \textbf{triage list} with the
+top-$K$ marked. \textbf{Replay a day}
+(Figure~\ref{fig:app-replay}) ranks the held-out orders of any test day blind, by
+purchase or delivery day, then reveals what each customer went through; for 16
+July 2018 at ten contacts, eight of the ten went on to rate 1--2 stars, four
+still waiting for a late parcel and four whose order never came, so a call at
+delivery could have reached none of them before they wrote and a message on the
+promised date all eight. \textbf{Model card} states what is deployed as read from
+the artifacts (Table~\ref{tab:deployed}), the protocol, the selected
+hyperparameters, the fold-to-fold variation, where the models should not be
+trusted \citep{mitchell2019modelcards}, and a calculator for both pilot arms with
+the costs as inputs; every figure on it is labelled observed, assumed, derived
+or planned. The application refits nothing: every figure is read from the result
+tables or computed from the saved test predictions, and
+Appendix~\ref{app:figures} gives a five-step guide to using it.
 
 \subsection{Robustness, reachability and reproducibility}
 
-Invalid input produces a specific message rather than a traceback: a promised
-date before the purchase date, a non-positive price, more sellers than items, a
-malformed, empty or oversized upload, a missing column, an unknown category or
-state, a missing artifact, a version mismatch. The data loader asserts the row
-count of all nine source tables and stops the app if they change. There are no
-API endpoints and no credentials anywhere: the batch CSV contract, documented
-with an example in \code{deployment/README.md}, is the programmatic surface.
+Invalid input --- a promised date before the purchase, a non-positive price,
+more sellers than items, a malformed, empty or oversized upload, a missing
+column, an unknown category or state, a missing artifact or a version mismatch
+--- produces a specific message rather than a traceback, and the data loader
+stops the app if the row count of any source table changes. There are no API
+endpoints and no credentials: the batch CSV contract in
+\code{deployment/README.md} is the programmatic surface.
 
-The Phase 1 dashboard became inaccessible when the GitHub account it was
-deployed from was suspended, which took the Community Cloud app down with it.
-The application now deploys from the team's current repository, and two things
-keep it reachable, both recorded in the README: Community Cloud puts an app
-without visitors for twelve hours to sleep behind a one-click wake-up button
-that any visitor can press, and the Python version must stay at 3.12 in the
-app's settings. A fresh clone reproduces everything, from the committed source
-tables to every table, figure and number in this document
-(Appendix~\ref{app:repro}).
+The Phase 1 dashboard went down with the suspended GitHub account it was
+deployed from. The application now deploys from the team's current repository;
+the README records what keeps it reachable (Community Cloud's one-click wake-up
+after twelve idle hours; Python 3.12 in the app's settings), and a fresh clone
+reproduces every table, figure and number here (Appendix~\ref{app:repro}).
