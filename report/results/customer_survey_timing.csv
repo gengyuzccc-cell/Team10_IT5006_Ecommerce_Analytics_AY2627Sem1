@@ -1,0 +1,3 @@
+window,late_low_reviews,survey_days_after_promise_median,survey_exactly_2_days_after_pct,survey_on_or_after_promise_pct,answer_days_after_promise_median,answered_on_or_after_promise_pct,answered_within_1_day_of_promise_pct,written_before_arrival_pct
+analysis window,4136,2.0,68.54448742746615,99.46808510638297,3.5513078703703704,99.56479690522244,0.0,87.30657640232108
+test window,287,2.0,71.42857142857143,100.0,3.590289351851852,100.0,0.0,77.35191637630662

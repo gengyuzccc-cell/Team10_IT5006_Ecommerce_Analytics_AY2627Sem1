@@ -1,0 +1,28 @@
+key,outcome,orders,denominator,denominator_n,per_1000,ci95_lo,ci95_hi
+placed,orders placed (purchases 30 June to 30 August 2018),12927,placed,12927,1000.0,999.702922750006,999.9999999999999
+on_time,parcel arrived by the promised date,11694,placed,12927,904.618240891158,899.43370334391,909.5623726898033
+late,parcel arrived after the promised date began (the report's definition),936,placed,12927,72.40659085634718,68.06495088373897,77.00228737716323
+late_on_promised_day,  ... during the promised day itself,335,placed,12927,25.914752069312293,23.313510739482442,28.797673282578025
+late_after_promised_day,  ... after the promised day ended,601,placed,12927,46.49183878703489,42.995079940649795,50.258051548185904
+never_delivered,parcel never delivered within the extract,297,placed,12927,22.97516825249478,20.530635601532158,25.703127353846135
+never_delivered_cancelled,  ... order cancelled or unavailable,149,placed,12927,11.526262860679198,9.825901596911432,13.516852993494188
+overdue_eod,no parcel when the promised day ended,898,placed,12927,69.46700703952966,65.21086583756265,73.9789513566574
+overdue_eod_never,  ... of whom never received it,297,placed,12927,22.97516825249478,20.530635601532158,25.703127353846135
+low,rated the order 1-2 stars,1418,placed,12927,109.69289084861143,104.42125313422548,115.19643128827691
+low_on_time,  ... parcel on time,923,placed,12927,71.40094376112013,67.08830680180215,75.968234778393
+low_late,  ... parcel late,287,placed,12927,22.20159356385859,19.800054024385418,24.88701917660283
+low_never,  ... parcel never delivered,208,placed,12927,16.090353523632707,14.060674390027524,18.40754975127937
+low_late_before_arrival,"late parcel, 1-2 stars written before it arrived",222,placed,12927,17.17335808772337,15.072964951070173,19.560624846382783
+eod_low_not_yet_written,"no parcel when the promised day ended, not yet rated then, went on to rate 1-2 stars",440,placed,12927,34.03728629999227,31.04734456045629,37.30408188269967
+reach_promise_only,rated 1-2 stars; reachable only by the promised-date message,398,placed,12927,30.788272607720277,27.94700696906813,33.90832250564963
+reach_delivery_only,rated 1-2 stars; reachable only by a call at delivery,945,placed,12927,73.10280807611974,68.74123582727839,77.71802321257489
+reach_either,rated 1-2 stars; reachable by either contact,42,placed,12927,3.2490136922719888,2.404694981965507,4.388479236466627
+reach_neither,rated 1-2 stars before either moment,33,placed,12927,2.55279647249942,1.818374490510154,3.5827789489709394
+top10,on the slides' daily top-ten list (grouped by purchase day),614,placed,12927,47.497485882261934,43.963360713718366,51.30046745582437
+top10_hit,  ... and rated the order 1-2 stars,351,placed,12927,27.152471571130192,24.48811015826358,30.09777747082096
+top10_hit_promise_reachable,  ... of whom not yet rated when the promised day ended (no parcel then),271,placed,12927,20.96387406204069,18.632810240217026,23.57955935374715
+top10_hit_delivery_only,  ... of whom reachable only by a call at delivery,48,placed,12927,3.7131585054537015,2.8019457526524936,4.919242318413668
+prewarn_flagged,warned at checkout (late risk at or above the 11% line),5647,delivered,12630,447.1100554235946,438.4563649002757,455.79590948874375
+prewarn_late_flagged,  ... parcel then late,773,delivered,12630,61.20348376880443,57.15498846109061,65.51882091607438
+prewarn_late_missed,"late parcel, not warned",163,delivered,12630,12.90577988915281,11.08020035427209,15.027572162566441
+prewarn_ontime_flagged,"warned, parcel then on time",4874,delivered,12630,385.9065716547902,377.45254087252874,394.4299851672574

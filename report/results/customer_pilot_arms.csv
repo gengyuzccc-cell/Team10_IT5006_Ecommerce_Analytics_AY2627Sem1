@@ -1,0 +1,6 @@
+arm,population,control_rate,per_day,arms,breakeven_relative,target_relative,treated_rate,n_per_arm_80,weeks_80,n_per_arm_90,weeks_90
+arm_b_two,promised-date message: every customer whose promised day ends without a parcel and who has not yet rated the order; message vs current practice,0.5472636815920398,12.96774193548387,2,0.22840909090909092,0.25,0.4104477611940298,209.0,5.0,279.0,7.0
+arm_b_three,"the same customers; message with the survey once the order is complete, message with the survey unchanged, current practice",0.5472636815920398,12.96774193548387,3,0.22840909090909092,0.25,0.4104477611940298,209.0,7.0,279.0,10.0
+arm_a,"delivery-day call: each day's ten riskiest delivered parcels whose customer has not yet rated the order, five contacted; sized for the break-even effect",0.2600732600732601,10.0,2,0.4806338028169014,0.4806338028169014,0.1350732600732601,159.0,5.0,212.0,7.0
+arm_a_25,"delivery-day call as above, sized for a one-in-four effect (reference)",0.2600732600732601,10.0,2,0.4806338028169014,0.25,0.19505494505494508,652.0,19.0,872.0,25.0
+slide_design,"slide 11: each day's top ten of the slides' list (purchase-day groups, scored with the realised delivery), five called and five held back",0.5716612377850163,10.0,2,0.21866096866096865,0.25,0.42874592833876224,191.0,6.0,256.0,8.0

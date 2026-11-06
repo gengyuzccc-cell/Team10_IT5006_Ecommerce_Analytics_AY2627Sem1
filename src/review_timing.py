@@ -269,7 +269,7 @@ if __name__ == "__main__":
     composition.to_csv(RESULTS / "review_timing_composition.csv", index=False)
     print(composition.round(3).to_string(index=False))
 
-    # Daily ten-a-day list, per 1,000 delivered orders, all hits against reachable hits.
+    # Daily ten-a-day list, per 1,000 reviewed orders, all hits against reachable hits.
     c = config.COSTS
     ten = cap[(cap["kind"] == "daily") & (cap["k"] == "10 a day")].iloc[0]
     per_1k = 1000 * ten["contacts"] / len(p)

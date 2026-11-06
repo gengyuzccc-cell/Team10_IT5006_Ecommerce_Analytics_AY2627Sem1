@@ -1,0 +1,8 @@
+topic,label,matched,read,correct,precision_pct,ci95_lo_pct,ci95_hi_pct
+not_received,not received (yet) / not fulfilled,3738,25,22,88.0,70.04420607907267,95.83318284955963
+late,late / slow / missed date,1340,25,24,96.0,80.45593626380625,99.29037664980127
+wrong_or_missing_item,wrong or missing item,2400,25,22,88.0,70.04420607907267,95.83318284955963
+defective_or_damaged,defective or damaged,1031,25,23,92.0,75.03389104960469,97.77795987151524
+quality_or_not_as_described,quality / not as described,1151,25,24,96.0,80.45593626380625,99.29037664980127
+seller_service_or_communication,seller service / communication,1507,25,20,80.0,60.86904963045967,91.13941531319742
+refund_cancel_return,refund / cancel / return,1538,25,24,96.0,80.45593626380625,99.29037664980127

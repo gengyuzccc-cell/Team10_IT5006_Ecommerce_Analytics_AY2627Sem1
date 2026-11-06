@@ -131,7 +131,7 @@ CLEANING_DECISIONS: dict[str, dict[str, str]] = {
     "coverage_ramp": {
         "issue": "The platform's first months are a pilot with negligible "
                  "volume, and the final weeks are truncated mid-cycle.",
-        "evidence": "Sep 2016 to Dec 2016 contribute 326 orders in total "
+        "evidence": "Sep 2016 to Dec 2016 contribute 329 orders in total "
                     "against a 2018 run-rate above 6,000 per month; orders "
                     "after 2018-08-31 are cut off before their reviews land.",
         "decision": "Restrict the analysis window to 2017-01-01 .. 2018-08-31 "

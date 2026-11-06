@@ -15,6 +15,14 @@ the two must agree exactly.
 The remaining checks cover the contracts the rest of the pipeline relies on:
 the join grain, the leakage guard in both regimes, split disjointness, and
 backward compatibility with Phase 1.
+
+Sections 8 to 11 read the tables the src/ scripts wrote rather than re-running
+them. Section 11, added after the presentation of 5 November 2026, ties the
+customer counts, contact lists, reais and pilot sizes of src/customer_view.py
+and the slide sources of src/slide_provenance.py to each other and to the
+earlier tables, checks that the slides are byte-identical to the locked deck,
+lints the documents for wording the revision retired, and checks that the
+Replay tab's blind download carries no outcome.
 """
 from __future__ import annotations
 
@@ -243,8 +251,9 @@ print("\n7. The serving path agrees with the training path")
 try:
     import types as _types
     _st = _types.ModuleType("streamlit")
-    _st.cache_resource = lambda **k: (lambda f: f)
-    _st.cache_data = lambda **k: (lambda f: f)
+    # Decorators used at import time, bare (@st.fragment) or called (@st.cache_data(...)).
+    _passthrough = lambda f=None, **k: f if callable(f) else (lambda g: g)  # noqa: E731
+    _st.cache_resource = _st.cache_data = _st.fragment = _passthrough
     sys.modules.setdefault("streamlit", _st)
     sys.path.insert(0, str(PROJECT_ROOT / "deployment"))
     import predict as PR
@@ -458,7 +467,7 @@ try:
     val = pd.read_csv(RESULTS / "review_timing_value.csv")
     at = val.loc[val["threshold"].round(2) == 0.11, "net_reachable_per_1k"].iloc[0]
     check("the reachable-only value recomputes from the per-order predictions and flags",
-          abs(net - at) < 1e-6, f"R${net:,.0f} per 1,000 delivered orders")
+          abs(net - at) < 1e-6, f"R${net:,.0f} per 1,000 reviewed orders")
     story = pd.read_csv(RESULTS / "story_order.csv").iloc[0]
     oid = story["order_id"]
     day = m[m["order_purchase_timestamp"].dt.date == pd.Timestamp("2018-07-16").date()]
@@ -471,6 +480,315 @@ try:
           f"answered {answered:%d %b %Y}, delivered {delivered:%d %b %Y}")
 except FileNotFoundError as exc:
     check("review-timing tables exist (run src/review_timing.py)", False, str(exc))
+
+
+# ===========================================================================
+print("\n11. Customer view and provenance (src/customer_view.py, src/slide_provenance.py)")
+# ---------------------------------------------------------------------------
+# These checks read the tables the two scripts wrote; they never re-run them.
+# They tie the customer counts, the contact lists, the reais, the pilot and the
+# sources of the slide numbers to one another and to the earlier tables, so a
+# number quoted in the report, the README or the app cannot drift from its source.
+import hashlib
+import math
+import re
+
+
+def _csv(name: str) -> pd.DataFrame:
+    return pd.read_csv(RESULTS / name)
+
+
+# The date a customer is quoted: the margin is chosen on validation outcomes only.
+try:
+    import customer_view as CV
+
+    frontier = _csv("customer_promise_frontier.csv")
+    rules = _csv("customer_promise_rules.csv")
+    platform = rules["buffer_days"].isna()
+    olist_val = float(rules.loc[platform & (rules["period"] == "validation"), "late_pct"].iloc[0])
+    r1_buffer = float(rules.loc[rules["rule"].str.startswith("R1"), "buffer_days"].iloc[0])
+    grid = frontier.dropna(subset=["buffer_days"])
+    smallest = float(grid.loc[grid["val_late_pct"] <= olist_val, "buffer_days"].min())
+    check("the quoted margin is the smallest whose validation late rate is no worse than Olist's",
+          smallest == r1_buffer == 8.0,
+          f"{r1_buffer:.1f} days; Olist's validation late rate {olist_val:.2f}%")
+    shuffled = frontier.copy()
+    order = np.random.default_rng(config.SEED).permutation(len(shuffled))
+    test_cols = ["late_pct", "late_calendar_day_pct", "mean_promised_days"]
+    for col in test_cols:
+        shuffled[col] = shuffled[col].to_numpy()[order]
+    moved = not np.allclose(shuffled[test_cols].to_numpy(), frontier[test_cols].to_numpy(),
+                            equal_nan=True)
+    chosen = (CV.choose_buffer(shuffled), CV.choose_buffer(shuffled, olist_val))
+    check("customer_view.choose_buffer() ignores the test window: shuffled test columns, same margin",
+          moved and chosen == (r1_buffer, r1_buffer), f"{chosen[0]:.1f} and {chosen[1]:.1f} days")
+except (FileNotFoundError, ImportError, KeyError, IndexError, ValueError) as exc:
+    check("promise-margin tables exist (run src/customer_view.py)", False, repr(exc))
+
+# What happened to the customers of the test window, each count with its population.
+try:
+    out = _csv("customer_outcomes_test.csv").set_index("key")
+    n = out["orders"]
+    p2_test = _csv("predictions_p2_test.csv")
+    p1a_test = _csv("predictions_p1a_test.csv")
+    comp = _csv("review_timing_composition.csv").set_index("list").loc["all reviewed orders"]
+    rules = _csv("customer_promise_rules.csv")
+    olist_test_late = int(rules.loc[rules["buffer_days"].isna() & (rules["period"] == "test"),
+                                    "n_late"].iloc[0])
+    check("every order placed in the test window arrived on time, arrived late or never arrived",
+          n["on_time"] + n["late"] + n["never_delivered"] == n["placed"],
+          f"{n['on_time']:,} + {n['late']:,} + {n['never_delivered']:,} = {n['placed']:,}")
+    by_den = out.groupby("denominator")["denominator_n"].unique()
+    check("every customer count names its population: orders placed or delivered orders",
+          set(by_den.index) == {"placed", "delivered"}
+          and list(by_den["placed"]) == [n["placed"]]
+          and list(by_den["delivered"]) == [len(p1a_test)],
+          f"placed {n['placed']:,}; delivered {len(p1a_test):,}")
+    check("the slides' daily top ten: 614 contacts, 351 rated 1-2 stars (review_timing_composition.csv)",
+          n["top10"] == comp["contacts"] == 614 and n["top10_hit"] == comp["hits"] == 351)
+    check("1,418 customers rated the order 1-2 stars, as in the per-order review predictions",
+          n["low"] == int(p2_test["actual_low_review"].sum()) == 1418, f"{n['low']:,}")
+    reach = ["reach_promise_only", "reach_delivery_only", "reach_either", "reach_neither"]
+    check("each customer who rated 1-2 stars falls in exactly one reach class",
+          int(n[reach].sum()) == n["low"],
+          " + ".join(f"{n[k]:,}" for k in reach) + f" = {n['low']:,}")
+    check("every late parcel was either warned at checkout or not: 936, as in the promise rules",
+          n["prewarn_late_flagged"] + n["prewarn_late_missed"] == n["late"] == olist_test_late == 936,
+          f"{n['prewarn_late_flagged']:,} + {n['prewarn_late_missed']:,} = {n['late']:,}")
+except (FileNotFoundError, KeyError, IndexError) as exc:
+    check("customer outcome tables exist (run src/customer_view.py)", False, repr(exc))
+
+# The reais: per 1,000 REVIEWED orders, from the assumed costs, reproducing earlier tables.
+try:
+    c = config.COSTS
+    dec = _csv("customer_value_decomposition.csv").set_index("list")
+    rtv = _csv("review_timing_value.csv")
+    gross = [col for col in dec.columns if col.startswith("gross_per_1k_")]
+    parts_add_up = np.allclose(dec[gross].sum(axis=1) - dec["contact_cost_per_1k"],
+                               dec["net_all_per_1k"])
+    same = []
+    for lst, thr in [("slides_threshold_011", 0.11), ("deployed_threshold_019", 0.19)]:
+        row = rtv.loc[rtv["threshold"].round(2) == thr].iloc[0]
+        same.append(abs(dec.loc[lst, "net_all_per_1k"] - row["net_all_per_1k"]) < 0.01
+                    and abs(dec.loc[lst, "net_not_written_per_1k"] - row["net_reachable_per_1k"]) < 0.01)
+    t011 = dec.loc["slides_threshold_011"]
+    check("the slides' R$1,466 / R$775 decompose by customer and match review_timing_value.csv",
+          parts_add_up and all(same)
+          and (round(t011["net_all_per_1k"]), round(t011["net_not_written_per_1k"])) == (1466, 775),
+          f"R${t011['net_all_per_1k']:,.0f} all hits / R${t011['net_not_written_per_1k']:,.0f} "
+          "not yet written (threshold 0.11; 0.19 checked too)")
+    comp = _csv("review_timing_composition.csv").set_index("list").loc["all reviewed orders"]
+    not_written = comp["contacts"] * (comp["never_delivered_per_100"]
+                                      + comp["delivered_reachable_per_100"]) / 100
+    expect = {
+        "net_all_per_1k": 1000 * (comp["hits"] * c["low_review_cost"]
+                                  - comp["contacts"] * c["outreach_cost"]) / comp["orders"],
+        "net_not_written_per_1k": 1000 * (not_written * c["low_review_cost"]
+                                          - comp["contacts"] * c["outreach_cost"]) / comp["orders"],
+    }
+    ten = dec.loc["slides_ten_a_day"]
+    check("the ten-a-day list is worth R$853 (all hits) / R$433 (not yet written) per 1,000 reviewed orders",
+          all(abs(ten[k] - v) < 0.01 for k, v in expect.items())
+          and (round(ten["net_all_per_1k"]), round(ten["net_not_written_per_1k"])) == (853, 433),
+          f"R${ten['net_all_per_1k']:,.0f} / R${ten['net_not_written_per_1k']:,.0f}")
+    val = _csv("customer_value.csv")
+    n_reviewed = len(_csv("predictions_p2_test.csv"))
+    formula = all(np.allclose(val[f"net_e{int(100 * e)}"],
+                              1000 * (e * val["hits"] * c["low_review_cost"]
+                                      - val["contacts"] * c["outreach_cost"]) / n_reviewed)
+                  for e in (1.0, 0.5, 0.25))
+    formula &= np.allclose(val["breakeven_share"],
+                           c["outreach_cost"] / (c["low_review_cost"] * val["precision"]))
+    check("every reais figure is per 1,000 reviewed orders and uses only the assumed costs",
+          formula, f"n = {n_reviewed:,} reviewed orders; R${c['outreach_cost']:.0f} a contact, "
+          f"R${c['low_review_cost']:.0f} a 1-2 star rating (config.COSTS)")
+except (FileNotFoundError, KeyError, IndexError) as exc:
+    check("customer value tables exist (run src/customer_view.py)", False, repr(exc))
+
+# The pilot: one arm per contact, sized with the same formula as before.
+try:
+    import pilot_design as PD
+
+    arms = _csv("customer_pilot_arms.csv").set_index("arm")
+    check("every pilot arm's size per arm comes from pilot_design.n_per_arm",
+          all(r[f"n_per_arm_{p}"] == PD.n_per_arm(r["control_rate"], r["treated_rate"], power=p / 100)
+              for _, r in arms.iterrows() for p in (80, 90)),
+          ", ".join(f"{a} {r['n_per_arm_80']:.0f}" for a, r in arms.iterrows()))
+    check("pilot weeks = arms x size per arm / orders a day / 7, rounded up",
+          all(r[f"weeks_{p}"] == math.ceil(round(r["arms"] * r[f"n_per_arm_{p}"] / r["per_day"] / 7, 9))
+              for _, r in arms.iterrows() for p in (80, 90)))
+    design = _csv("pilot_design.csv")
+    slide_row = design[(design["k_per_day"] == 10)
+                       & np.isclose(design["relative_reduction"], 0.25)].iloc[0]
+    s11 = arms.loc["slide_design"]
+    check("the slide-11 design equals pilot_design.csv: 191 per arm, six weeks",
+          s11["n_per_arm_80"] == slide_row["n_per_arm_80"] == 191
+          and s11["weeks_80"] == slide_row["weeks_80"] == 6
+          and np.isclose(s11["control_rate"], slide_row["control_rate"]))
+except (FileNotFoundError, KeyError, IndexError) as exc:
+    check("pilot arm table exists (run src/customer_view.py)", False, repr(exc))
+
+# Box 1: one customer's order, from the story table and from the per-order table.
+try:
+    story = _csv("customer_story.csv").iloc[0]
+    journeys = _csv("customer_journeys_test.csv")
+    oid = story["order_id"]
+    check("Box 1's order: 23rd of 238 at checkout, 1st of 244 at delivery, 8 of its day's top ten "
+          "reachable only on the promised date",
+          oid == _csv("story_order.csv").iloc[0]["order_id"] and oid.startswith("e1320973")
+          and (story["late_rank_on_day"], story["delivered_orders_on_day"]) == (23, 238)
+          and (story["low_rank_on_day"], story["reviewed_orders_on_day"]) == (1, 244)
+          and story["top10_hits"] == 8 and story["top10_hits_reachable_on_promise"] == 8
+          and story["top10_hits_reachable_at_delivery"] == 0
+          and story["requoted_date"] == "2018-08-12"
+          and story["reach_class"] == "promised-date message only",
+          f"{oid[:8]}, quoted {story['requoted_date']}, {story['reach_class']}")
+    row = journeys.set_index("order_id").loc[oid]
+    day = journeys[pd.to_datetime(journeys["purchase"]).dt.date
+                   == pd.Timestamp(story["purchase"]).date()]
+    top = day[day["low_rank_purchase_day"] <= 10]
+    hits = top["low"].astype(bool)
+    check("the story row agrees with the per-order journey table the application reads",
+          row["late_rank_on_day"] == story["late_rank_on_day"]
+          and row["delivered_on_day"] == story["delivered_orders_on_day"]
+          and row["low_rank_purchase_day"] == story["low_rank_on_day"]
+          and row["reviewed_on_purchase_day"] == story["reviewed_orders_on_day"] == len(day)
+          and row["reach_class"] == story["reach_class"]
+          and str(row["requoted_date"])[:10] == story["requoted_date"]
+          and int(hits.sum()) == story["top10_hits"]
+          and int((hits & top["promise_reach"].astype(bool)).sum())
+          == story["top10_hits_reachable_on_promise"]
+          and int((hits & top["delivery_reach"].astype(bool)).sum())
+          == story["top10_hits_reachable_at_delivery"],
+          f"{len(day)} reviewed orders that day; top ten: {int(hits.sum())} rated 1-2 stars")
+except (FileNotFoundError, KeyError, IndexError) as exc:
+    check("story tables exist (run src/customer_view.py)", False, repr(exc))
+
+# Where every number on the locked slides comes from (report Appendix P).
+try:
+    prov = _csv("slide_provenance.csv")
+    numeric = prov.loc[prov["matches"].notna(), "matches"]
+    numeric = numeric.map(lambda v: v if isinstance(v, (bool, np.bool_))
+                          else str(v).strip().lower() == "true")
+    check("every checked number on the locked slides matches its recomputation",
+          len(numeric) > 0 and bool(numeric.all()),
+          f"{int(numeric.sum())} of {len(numeric)} numeric rows match; {len(prov)} rows in all")
+    from_costs = prov[prov["source"].fillna("").str.contains("config.COSTS", regex=False)]
+    check("every slide number sourced from config.COSTS is labelled an assumption",
+          len(from_costs) > 0 and bool((from_costs["kind"] == "assumed").all()),
+          f"{len(from_costs)} rows")
+    kinds = {"observed", "assumed", "derived", "planned", "literature", "no data source", "wording"}
+    check("the provenance table covers all 13 slides, every row of a named kind",
+          set(prov["slide"]) == set(range(1, 14)) and set(prov["kind"]) <= kinds,
+          ", ".join(f"{k} {v}" for k, v in prov["kind"].value_counts().items()))
+except (FileNotFoundError, KeyError) as exc:
+    check("slide_provenance.csv exists (run src/slide_provenance.py)", False, repr(exc))
+
+# Wording the revision retired. docs/presentation_script.md is left out on purpose:
+# it records the talk as delivered.
+_sep = r"[\s~]+"
+LINT = {
+    "'per 1,000 delivered orders' (values are per 1,000 reviewed orders)":
+        rf"per{_sep}(?:1\{{,\}}000|1\\,000|1,000|1000|thousand){_sep}delivered{_sep}orders",
+    "'never contacted anyone' / 'was ever contacted' / 'nobody in this history' (no data source)":
+        rf"never{_sep}contacted{_sep}anyone|was{_sep}ever{_sep}contacted"
+        rf"|nobody{_sep}in{_sep}this{_sep}(?:history|data)",
+    "the test window written '2018-07-01 to 2018-08-31'": rf"2018-07-01{_sep}to{_sep}2018-08-31",
+    "'would-be'": r"would-be",
+    "'Group 10' (the team is Team 10)": rf"Group{_sep}10\b",
+}
+LINT_FILES = (sorted((PROJECT_ROOT / "report" / "sections").glob("p3_*.tex"))
+              + [PROJECT_ROOT / "README.md", PROJECT_ROOT / "build_submission.py"]
+              + [PROJECT_ROOT / "docs" / f for f in
+                 ("feedback_responses.md", "requirements_checklist.md", "README.md")]
+              + sorted((PROJECT_ROOT / "deployment").glob("*.py"))
+              + [PROJECT_ROOT / "deployment" / "README.md", PROJECT_ROOT / "dashboard" / "app.py"]
+              + sorted((PROJECT_ROOT / "src").glob("*.py")))
+# A phrase in the app may be split over adjacent string literals ("... nobody in this "
+# / "data ..."): blank out the quotes of such joins, keeping every character position
+# (and so every line number) where it was.
+_JOIN = re.compile(r"""(["'])(\s*\n\s*)([rRbBfFuU]{0,2})(["'])""")
+_texts = {f: _JOIN.sub(lambda m: " " + m.group(2) + " " * (len(m.group(3)) + 1),
+                       f.read_text("utf-8", errors="replace"))
+          for f in LINT_FILES if f.exists()}
+for label, pattern in LINT.items():
+    rx = re.compile(pattern, re.IGNORECASE)
+    found = [f"{f.relative_to(PROJECT_ROOT).as_posix()}:{text.count(chr(10), 0, m.start()) + 1}"
+             for f, text in _texts.items() for m in rx.finditer(text)]
+    check(f"retired wording absent from the report, README, docs, app and src: {label}",
+          not found, ", ".join(found))
+
+# The slides are submitted exactly as locked on 4 November 2026.
+LOCKED_SLIDES = {
+    "Team10_Phase3_slides.pptx": "189cd5afafb7d2dd77b5ff8fc9c759fda0b197a2c5a2557dd43ffd736536cfe8",
+    "Team10_Phase3_slides.pdf": "f0f159b4fd08f327a1ff5f9c5f2f175c23f125e1467b831366e5f8dde2f77395",
+}
+for name, digest in LOCKED_SLIDES.items():
+    path = PROJECT_ROOT / "docs" / name
+    got = hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else "missing"
+    check(f"docs/{name} is byte-identical to the deck locked on 4 November", got == digest,
+          f"sha256 {got[:12]}...")
+
+# What unhappy customers wrote: the keyword dictionary was checked on a held-out sample.
+try:
+    prec = _csv("customer_complaint_precision.csv")
+    check("the complaint topics were checked on held-out comments: 7 topics x 25, precision 80-96%",
+          len(prec) == 7 and bool((prec["read"] == 25).all())
+          and bool(prec["precision_pct"].between(80, 96).all()),
+          f"{prec['precision_pct'].min():.0f}-{prec['precision_pct'].max():.0f}%")
+    labels = _csv("customer_topic_labels.csv")
+    per_topic = labels.groupby("topic")["correct"].agg(["size", "sum"])
+    p = prec.set_index("topic").loc[per_topic.index]
+    check("the precision table recomputes from the 175 committed labels",
+          len(labels) == 175 and set(per_topic.index) == set(prec["topic"])
+          and (per_topic["size"] == p["read"]).all() and (per_topic["sum"] == p["correct"]).all()
+          and np.allclose(100 * per_topic["sum"] / per_topic["size"], p["precision_pct"]))
+except (FileNotFoundError, KeyError) as exc:
+    check("complaint tables exist (run src/customer_view.py)", False, repr(exc))
+
+# The Replay tab starts blind: its download must not carry what happened.
+OUTCOME_COLUMNS = {
+    "actual_low_review", "actual_days", "actual_late", "written_before_arrival", "outcome",
+    "low", "days_late", "delivered", "answered", "order_status", "review_score",
+    "review_title", "review_message", "overdue_eod", "promise_reach", "delivery_reach",
+    "reach_class", "review_predates_order",
+    # the same outcomes under the labels the revealed table shows
+    "actual review", "review written", "actual days", "delivery", "stars",
+    "what the customer experienced", "could still be reached by",
+}
+try:
+    # Imported under the streamlit stub of section 7 (which passes st.fragment and the
+    # cache decorators through), so nothing renders and nothing is cached.
+    import replay as RP
+
+    if not hasattr(RP, "blind_columns"):
+        raise AttributeError("deployment/replay.py has no blind_columns() yet")
+    frame = None
+    try:
+        loaded = RP.load_replay()
+        loaded = loaded if isinstance(loaded, tuple) else (loaded,)
+        frame = next(x for x in loaded if isinstance(x, pd.DataFrame))
+    except Exception:  # noqa: BLE001 - fall back to every column the replay can read
+        frame = pd.concat([_csv(f).head(50) for f in
+                           ("predictions_p2_test.csv", "predictions_p1a_test.csv",
+                            "predictions_p1b_test.csv", "customer_journeys_test.csv")], axis=1)
+        frame = frame.loc[:, ~frame.columns.duplicated()]
+    for arg in ((frame,), (list(frame.columns),), ()):
+        try:
+            kept = RP.blind_columns(*arg)
+            break
+        except TypeError:
+            continue
+    else:
+        raise TypeError("blind_columns() accepts neither a frame, a column list nor no argument")
+    kept = list(kept.columns) if isinstance(kept, pd.DataFrame) else list(kept)
+    leaked = sorted(set(kept) & OUTCOME_COLUMNS)
+    check("replay.blind_columns() keeps every outcome out of the blind download",
+          bool(kept) and not leaked,
+          f"keeps {len(kept)} columns; outcome columns kept: {', '.join(leaked) or 'none'}")
+except Exception as exc:  # noqa: BLE001
+    check("replay.blind_columns() keeps every outcome out of the blind download", False,
+          f"{type(exc).__name__}: {exc}")
 
 
 # ===========================================================================

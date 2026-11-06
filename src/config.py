@@ -210,11 +210,14 @@ THRESHOLD_GRID = (0.05, 0.95, 0.01)
 # --------------------------------------------------------------------------
 # ASSUMPTIONS, NOT DATA. Olist publishes no cost figures, so these are stated
 # openly and every conclusion drawn from them is accompanied by a sensitivity
-# sweep. Units are Brazilian reais per order.
+# sweep: report/results/customer_value_sensitivity.csv (src/customer_view.py)
+# varies the contact cost, the review cost and the share of reached customers a
+# contact turns around. Units are Brazilian reais per order.
 COSTS = {
     # Problem 2: contacting a customer who was never going to complain wastes
     # an agent's time; missing one that does costs a 1-2 star review, which
-    # Deshpande et al. (2023) trace through to lost seller sales.
+    # Deshpande and Pendem (2023) trace through to lost seller sales on another
+    # marketplace.
     "outreach_cost": 5.0,
     "low_review_cost": 40.0,
     # Problem 1: expediting an order that would have arrived on time wastes

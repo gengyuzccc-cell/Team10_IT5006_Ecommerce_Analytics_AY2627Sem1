@@ -3,10 +3,11 @@
     python src/capacity_metrics.py      # first: writes capacity_p2_daily.csv
     python src/pilot_design.py          # then: writes report/results/pilot_*.csv
 
-The cost analysis values a contact at (avoided 1-2 star review) x R$40 minus
-R$5 of agent time, which assumes that contacting a customer who would have left
-a low review prevents that review. Nothing in the data can test that: Olist
-never contacted anyone, so the counterfactual is unobserved. The Phase 2
+The cost analysis values a contact at (1-2 star rating turned around) x R$40
+minus R$5 of agent time, which assumes that contacting a customer who would have
+rated the order 1-2 stars turns that experience around. Nothing in the data can
+test that: the tables record no contact other than the survey, so the
+counterfactual is unobserved. The Phase 2
 feedback asked for this to be stated as a limitation and for a pilot that would
 measure it. This script sizes that pilot from the numbers the model already
 reports, so the recommendation is concrete rather than a gesture.
@@ -19,9 +20,11 @@ contacted, half are left alone - and the outcome is the 1-2 star review rate in
 each arm. Randomising *inside* the list, rather than contacting everyone on it,
 is what makes the comparison fair: both arms have the same predicted risk.
 
-The control arm's rate is known already: it is the model's precision at that
+The control arm's expected rate is the model's historical precision at that
 daily K on the held-out test window (capacity_p2_daily.csv), 0.572 at ten
-contacts a day. The treated arm's rate is what the pilot measures. Sample size
+contacts a day - an expectation, not a measured control group. The treated arm's
+rate is what the pilot measures. src/customer_view.py re-sizes the pilot on the
+customers each contact can still reach (customer_pilot_arms.csv). Sample size
 for a two-sided two-proportion z-test at alpha = 0.05 follows the standard
 formula; durations assume K contacts a day split evenly across the arms.
 
