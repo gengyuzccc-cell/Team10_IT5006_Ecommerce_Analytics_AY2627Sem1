@@ -63,9 +63,10 @@ leakage by prediction moment --- the gap Section~\ref{sec:data} closes.
 The boosted learner used here is \code{HistGradientBoosting}: LightGBM's
 histogram-binned design \citep{ke2017lightgbm} implemented inside
 \code{scikit-learn} \citep{sklearn2024hgb}, so it stays within the brief's
-toolset rather than adding XGBoost \citep{chen2016xgboost}; it handles missing
-values natively, which the cold-start track-record features need; and it fits
-an order of magnitude faster than a comparable forest. Heterogeneous ensembles
+toolset rather than adding XGBoost \citep{chen2016xgboost}; it fits an order of
+magnitude faster than a comparable forest; and although it can route missing
+values natively, every family here shares one median imputation, so the rungs
+are compared like for like. Heterogeneous ensembles
 follow \citet{wolpert1992stacking}. The literature supplies the ranking; the
 ladder of Section~\ref{sec:method} supplies what it cannot --- whether, on this
 data, each rung beats the one below it.

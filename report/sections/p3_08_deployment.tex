@@ -40,8 +40,8 @@ uses. The artifacts total under 1\,MB and record the \code{scikit-learn}
 version that wrote them; \code{requirements.txt} pins that version, the loader
 raises a visible warning if it ever drifts, and the app runs on Python 3.12,
 the interpreter the pinned numpy publishes wheels for. Models are loaded
-lazily, so a visitor who only browses the exploratory tabs never pays for
-unpickling one.
+once per server process and cached, so no visitor pays for unpickling them
+twice.
 
 \subsection{What the application does}
 
