@@ -19,8 +19,8 @@
 #
 # WHY THE ENVIRONMENT MARKERS
 # ---------------------------
-# Every number in report/main.pdf was produced on Python 3.10 with the exact
-# versions pinned below, so those pins hold for Python <= 3.12.
+# Numbers produced on Python 3.10.9 with these pins; the app runs on 3.12. The
+# exact pins below apply to every Python up to 3.12.
 #
 # Streamlit Cloud may build on a newer interpreter. numpy 1.26.4 ships wheels
 # only up to cp312, so on Python 3.13+ pip finds no wheel, falls back to

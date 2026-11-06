@@ -10,14 +10,16 @@ reminders, mapped to where it is satisfied. **§** refers to the final report.
 | Cover page | Cover, with the application link and the GitHub link |
 | Executive summary | Executive Summary (unnumbered, before §1) |
 | Literature review (updated if asked in Phase 1 — it was) | §2, revised for all four Phase 1 points; the revision is stated in its opening paragraph |
-| All other corrections/updates asked by evaluators in Phases 1 and 2 | Incorporated throughout; Appendix I (two tables) maps every point to its section; `docs/feedback_responses.md` |
+| All other corrections/updates asked by evaluators in Phases 1 and 2 | Incorporated throughout; Appendix I maps every point to its section (one table per round of feedback); `docs/feedback_responses.md` |
+| Presentation feedback answered | Appendix I Table 22, Appendix P (every number on the locked slides: its kind, source and, where needed, a correction); `docs/feedback_responses.md` |
+| Report resubmitted | Revision note on the cover (revised after the presentation of 5 November 2026) |
 | Dataset and preprocessing | §3 (+ Appendix B: data model, cleaning decisions, data dictionary) |
-| Problem definition and stakeholder context | §1 (Tables 1 and 2) |
+| Problem definition and stakeholder context | §1 (Box 1, Tables 1–2): one customer's order, each problem as that customer's question, and the team that acts at each moment |
 | Exploratory analysis highlights | §4 (figures in Appendix O) |
 | Modelling approaches (classification and regression) | §5 features, §6 methodology (regression 1A; classification 1B and 2; three families reused) |
 | Results and evaluation | §7 (Tables 3–6, fold-to-fold variation, capacity view, error analysis; Appendices G and J) |
-| Model deployment and application | §8 (Table 7, Figures 25–27) |
-| Business recommendations and impact | §9 (cost layer, recommendations by stakeholder, the pilot, impact); when the review is written, and the value on the reachable share, in Appendix M |
+| Model deployment and application | §8 (Table 7), Appendix O usage guide and application figures, nine tabs |
+| Business recommendations and impact | §9 (recommendations along the customer's order, Table 8 observed / assumed / derived, Table 9 customer outcomes, a pilot per contact); when the review is written in Appendix M; the customer tables behind Sections 4 and 9 in Appendix Q |
 | References | 50 entries, every one verified against the publisher record or DOI |
 | Standalone: complete for a reader who has not seen earlier submissions | Yes — the report re-states the data, EDA, literature and candidates rather than referring to earlier PDFs |
 | 12pt font, single-spaced; figure captions and table labels | `\documentclass[12pt,a4paper]`; every figure and table captioned and numbered, and every one referred to from the text |
@@ -31,13 +33,13 @@ reminders, mapped to where it is satisfied. **§** refers to the final report.
 | Streamlit Cloud (recommended) | https://team10-it5006-olist.streamlit.app, built from `deployment/app.py` via the `dashboard/app.py` entry point, Python 3.12 |
 | Live URL in the final report | Cover and §8 |
 | Demonstrates at least one deployed model | All three: lead-time regression, derived late flag, low-review classifier (single order, batch CSV, triage list, replay) |
-| Clear usage instructions | Sidebar guide and five-minute tour in the app; `deployment/README.md`; §8.2 |
-| Predicts on held-out historical records simulating new orders | The *Replay a day* tab scores any purchase day of the July–August 2018 test window — never used to fit, tune or threshold — and reveals the outcomes |
+| Clear usage instructions | Sidebar guide and five-minute tour in the app; `deployment/README.md`; §8.2 and the usage guide in Appendix O |
+| Predicts on held-out historical records simulating new orders | The *Replay a day* tab scores any purchase day of the test window (orders placed 30 June to 30 August 2018) — never used to fit, tune or threshold — first blind, then with the outcomes revealed |
 | Error handling for edge cases | Invalid dates, non-positive amounts, more sellers than items, empty/malformed/oversized CSV, missing columns, unknown category or state, missing artifacts, scikit-learn version drift, changed source tables |
 | API endpoints documented with examples | None exposed; the batch CSV contract (columns, types, example row, output columns) is documented in `deployment/README.md` and the template is downloadable in the app |
 | No hardcoded credentials | None; the app reads only committed files |
-| Test deployment before submission | Local run of both entry points; Playwright capture of every tab (`deployment/capture_screenshots.py`); the deployed URL exercised after each push |
-| Dashboard updated with model outputs; screenshots in the slides | Predict, Replay a day (with the new *review written* column) and Model card tabs; `docs/screenshots/`; slide 9 (Replay a day, with a button that opens the live app) |
+| Test deployment before submission | Local run of both entry points; Playwright capture of seven of the nine tabs, all four model tabs included (`deployment/capture_screenshots.py`); the deployed URL exercised after each push |
+| Dashboard updated with model outputs; screenshots in the slides | Customer journey, Predict (with the date it would quote), Replay a day and Model card tabs; `docs/screenshots/`; slide 9 (Replay a day, with a button that opens the live app) |
 
 ## GitHub repository
 
@@ -58,15 +60,15 @@ reminders, mapped to where it is satisfied. **§** refers to the final report.
 |---|---|
 | Professional slides (PowerPoint or PDF), locked by Wed 4 Nov 2026 23:59 | `docs/Team10_Phase3_slides.pptx` and `.pdf` |
 | Screenshots of the deployed application | Slide 9 (the *Replay a day* tab on 16 July 2018; the live app opens from slides 1, 9 and 13) |
-| 10 minutes + 5 minutes Q&A | 13 slides told as one story; the speaker notes (1,143 words) are timed to 8:00 and are followed by a 2-minute live demo of the app; 15 predicted questions answered in `docs/presentation_script.md` |
-| Identical deck in the ZIP | `build_submission.py` copies the same files |
+| 10 minutes + 5 minutes Q&A | 13 slides told as one story; the speaker notes (1,143 words) are timed to 8:00 and are followed by a 2-minute live demo of the app; 16 predicted questions answered in `docs/presentation_script.md` |
+| Identical deck in the ZIP | `build_submission.py` refuses to build unless both slide files match the SHA-256 of the deck locked on 4 November; a validation check compares the same hashes |
 
 ## Submission format
 
 | Item | Where |
 |---|---|
 | Slides via Canvas by Wed 4 Nov 2026 23:59 | `docs/Team10_Phase3_slides.pdf` (or the PPTX) |
-| ZIP `Team10_IT5006_Ecommerce_Analytics_AY2627Sem1.zip` by Sun 8 Nov 2026 23:59: final report PDF + slides + GitHub link | `python build_submission.py` |
+| ZIP `Team10_IT5006_Ecommerce_Analytics_AY2627Sem1.zip` by Sun 8 Nov 2026 23:59: final report PDF + slides + GitHub link | `python build_submission.py`: refuses unless the tree is clean and pushed (HEAD = origin/main), the slides match their locked hashes, `docs/` holds the same report PDF as `report/`, and the body is at most 20 pages; `GITHUB_LINK.txt` names the commit submitted |
 | Peer evaluation via the Canvas survey by Sun 15 Nov 2026 23:59 | Each member individually |
 
 ## Modelling, coding, data and deployment guidelines
@@ -82,7 +84,7 @@ reminders, mapped to where it is satisfied. **§** refers to the final report.
 | Target leakage via post-outcome columns | One forbidden set per prediction moment, enforced by `assert_no_leakage` and tested in both directions |
 | Class imbalance; not accuracy alone | PR-AUC against its floor, majority accuracy beside accuracy, balanced accuracy, calibration, Precision@K |
 | Clean, commented code; meaningful names | `src/` modules carry the reasoning for each decision |
-| Error handling and data validation | 60 checks in `tests/test_leakage.py`; row-count assertions on load; typed errors in the app |
+| Error handling and data validation | 89 checks in `tests/test_leakage.py`; row-count assertions on load; typed errors in the app |
 | Separation of preparation, modelling, evaluation, deployment | `data_load.py` / `features.py` → `modeling.py` → `evaluate.py` → `deployment/` |
 | Olist as the only data source; transformations documented | No external data; `CLEANING_DECISIONS`; Appendix B |
 | Reproducibility | Appendix A: the run order that regenerates every artifact, table, figure and number |
