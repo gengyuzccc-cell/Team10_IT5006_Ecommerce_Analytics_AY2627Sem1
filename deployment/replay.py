@@ -8,8 +8,8 @@ predictions src/train_models.py wrote for it are read back here one day at a tim
 and ranked by the deployed model's risk that the customer will rate the order
 1-2 stars.
 
-Every day opens BLIND: the list shows what the team would see when it is drawn up
-- the scores, the ranks and each order's details - and its download holds only
+Every day opens BLIND: the list shows no outcome, only the scores, the ranks
+and each order's details, and its download holds only
 those columns (blind_columns()). On the purchase-day list that leaves out the
 checkout forecast and late risk as well: they were saved for delivered orders
 only, so a blank cell would show which customers never received their parcel.
@@ -91,8 +91,8 @@ LISTS = {
 
 
 def blind_columns(columns=None, delivered_only: bool = False) -> list[str]:
-    """The columns a blind list may show, in their order: what the team would see
-    when the list is drawn up. Every outcome column (OUTCOME_COLUMNS: the rating, the
+    """The columns a blind list may show, in their order, before anything is
+    revealed. Every outcome column (OUTCOME_COLUMNS: the rating, the
     delivery, when the review was written, the reach class) is left out, and so are
     the checkout columns (CHECKOUT_COLUMNS) unless every order on the list was
     delivered (delivered_only, the delivery-day list): elsewhere they are blank

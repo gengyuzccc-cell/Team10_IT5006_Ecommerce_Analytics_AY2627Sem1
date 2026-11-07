@@ -2,7 +2,7 @@
 
 # Phase 3 presentation: script, demo path and predicted questions
 
-Group 10 · IT5006 · 10 minutes of presentation + 5 minutes of questions · deck: [`Team10_Phase3_slides.pptx`](Team10_Phase3_slides.pptx) (13 slides; present from the .pptx — the [PDF](Team10_Phase3_slides.pdf) is a static copy of the same 13 slides).
+Team 10 · IT5006 · 10 minutes of presentation + 5 minutes of questions · deck: [`Team10_Phase3_slides.pptx`](Team10_Phase3_slides.pptx) (13 slides; present from the .pptx — the [PDF](Team10_Phase3_slides.pdf) is a static copy of the same 13 slides).
 
 The English text below is word-for-word the speaker notes in the deck (Presenter View, Alt+F5), including the time stamp at the start of each note.
 

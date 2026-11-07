@@ -552,7 +552,7 @@ try:
     check("each customer who rated 1-2 stars falls in exactly one reach class",
           int(n[reach].sum()) == n["low"],
           " + ".join(f"{n[k]:,}" for k in reach) + f" = {n['low']:,}")
-    check("every late parcel was either warned at checkout or not: 936, as in the promise rules",
+    check("every late parcel was either flagged at checkout or not: 936, as in the promise rules",
           n["prewarn_late_flagged"] + n["prewarn_late_missed"] == n["late"] == olist_test_late == 936,
           f"{n['prewarn_late_flagged']:,} + {n['prewarn_late_missed']:,} = {n['late']:,}")
 except (FileNotFoundError, KeyError, IndexError) as exc:
@@ -693,8 +693,10 @@ LINT = {
     "'never contacted anyone' / 'was ever contacted' / 'nobody in this history' (no data source)":
         rf"never{_sep}contacted{_sep}anyone|was{_sep}ever{_sep}contacted"
         rf"|nobody{_sep}in{_sep}this{_sep}(?:history|data)",
-    "the test window written '2018-07-01 to 2018-08-31'": rf"2018-07-01{_sep}to{_sep}2018-08-31",
-    "'would-be'": r"would-be",
+    "the test window written '2018-07-01 to 2018-08-31' or 'July-August 2018'":
+        rf"2018-07-01{_sep}to{_sep}2018-08-31|July(?:{_sep})?(?:–|—|-{{1,2}})(?:{_sep})?August{_sep}2018",
+    "'would-be' / 'headed off' / 'averted' / 'prevents the review'":
+        rf"would-be|headed{_sep}off|\baverted\b|prevents{_sep}the{_sep}review",
     "'Group 10' (the team is Team 10)": rf"Group{_sep}10\b",
 }
 LINT_FILES = (sorted((PROJECT_ROOT / "report" / "sections").glob("p3_*.tex"))

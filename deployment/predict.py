@@ -949,8 +949,9 @@ def render_model_card(df: pd.DataFrame | None = None) -> None:
         st.caption(
             "Every Problem 2 candidate on the five expanding-window folds and the "
             "validation period, with the test score beside them. The fold-to-fold "
-            "spread (about ±0.09) is a property of the windows — the 2017 folds are "
-            "harder and have a higher base rate — and it dwarfs the gap between the "
+            "spread (about ±0.09) is a property of the windows — the mean over candidates "
+            "runs from 0.376 on the first fold to 0.630 on the fourth — and it dwarfs "
+            "the gap between the "
             "best candidates (under 0.001), which is why selection ranks models "
             "within each window rather than averaging scores across them.")
         p2 = folds[folds["problem"] == "P2 low review"].sort_values("mean_rank_recent")
@@ -1132,9 +1133,10 @@ def render_value_and_pilot() -> None:
         "A contact can only turn around a customer who has not yet rated the order, so "
         "each value counts the customers still reachable at that contact's moment; the "
         "net is per 1,000 reviewed orders, at three shares of them turned around. The "
-        "slides valued their list by every customer on it, including those who had "
-        "already rated a late parcel or whose order never came (customer_value.csv "
-        "keeps both scopes).")
+        "slides' upper value counted every listed customer who rated 1–2 stars; their "
+        "lower values left out only those who rated a late parcel before it arrived, so "
+        "they still count every such customer whose order never came (customer_value.csv "
+        "keeps all three scopes).")
 
     # -- the pilot ---------------------------------------------------------------
     st.markdown("##### Sizing the pilot")

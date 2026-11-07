@@ -74,8 +74,9 @@ The application has nine tabs and opens on the customer.
    capacity you enter, and the precision and recall that capacity reached on the
    held-out window beside it.
 4. **Replay a day** — pick a day of the held-out test window and a daily
-   capacity K. Every day opens **blind**: the list shows what a team would see
-   when it is drawn up — the scores, the ranks and each order's details — and its
+   capacity K. Every day opens **blind**: the list shows the scores, the ranks and
+   each order's details but no outcome (a purchase day's orders are scored with
+   their realised delivery, as on the slides) — and its
    download holds only those columns (`replay.blind_columns()`, checked in
    `tests/test_leakage.py`). On the purchase-day list the checkout forecast and late
    risk wait for the reveal too: they were saved for delivered orders only, so a

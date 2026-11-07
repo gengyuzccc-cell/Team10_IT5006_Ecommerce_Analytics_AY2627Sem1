@@ -14,7 +14,7 @@ reminders, mapped to where it is satisfied. **§** refers to the final report.
 | Presentation feedback answered | Appendix I Table 22, Appendix P (every number on the locked slides: its kind, source and, where needed, a correction); `docs/feedback_responses.md` |
 | Report resubmitted | Revision note on the cover (revised after the presentation of 5 November 2026) |
 | Dataset and preprocessing | §3 (+ Appendix B: data model, cleaning decisions, data dictionary) |
-| Problem definition and stakeholder context | §1 (Box 1, Tables 1–2): one customer's order, each problem as that customer's question, and the team that acts at each moment |
+| Problem definition and stakeholder context | §1 (Box 1, Tables 1–2): one customer's order, what that customer needs at each moment, and the team that acts there |
 | Exploratory analysis highlights | §4 (figures in Appendix O) |
 | Modelling approaches (classification and regression) | §5 features, §6 methodology (regression 1A; classification 1B and 2; three families reused) |
 | Results and evaluation | §7 (Tables 3–6, fold-to-fold variation, capacity view, error analysis; Appendices G and J) |

@@ -38,7 +38,7 @@ blind and then with what actually happened
 (*Replay a day*); and carries a model card that labels each number observed,
 assumed, derived or planned and takes both assumed costs as inputs.
 
-## What changes for customers (held-out window, 30 June – 30 August 2018)
+## What the held-out window shows for customers (30 June – 30 August 2018)
 
 Counted on the test window, on which no model, threshold or margin was fitted
 or chosen. Each count names its population: the 12,927 orders placed, the
@@ -52,8 +52,8 @@ or chosen. Each count names its population: the 12,927 orders placed, the
   Quoted bare, the forecast would have been missed for 31.9% of customers.
 - **Hearing first when a date slips.** 898 of the 12,927 orders placed (69.5 in
   1,000) still had no parcel when the promised day ended; 297 of them never
-  arrived. Of the 804 such customers who had not yet rated the order when that
-  day ended, 440 (55%) went on to rate it 1–2 stars: 31% of the 1,418 customers
+  arrived. Of the 804 such customers who rated the order only after that day
+  ended, 440 (55%) gave it 1–2 stars: 31% of the 1,418 customers
   who rated 1–2 stars in the window. The calendar finds them with no model, so
   customer care can write that day (an apology, the status, a new date or a
   refund) and ask for the review once the order is complete. Every customer is
@@ -247,8 +247,9 @@ assumptions (R$5 a contact, R$40 for a 1–2 star rating a contact turns around;
 Olist publishes no costs): the delivery-day call pays only if it turns around
 about one in two of those customers, the promised-date message about one in
 four. The R$775 on the slides belongs to the threshold-0.11 list; the
-ten-a-day list is worth R$433 per 1,000 reviewed orders counting only those not
-yet written (R$853 counting all), and only if every contact works.
+ten-a-day list is worth R$433 per 1,000 reviewed orders leaving out those who
+rated a late parcel before it arrived (R$853 counting all), and only if every
+contact works.
 `report/results/customer_value_sensitivity.csv` varies both costs and the share
 a contact turns around.
 
@@ -258,7 +259,7 @@ promised date has passed, and 87% of its 1–2 star reviews are written before t
 parcel arrives (a median 4.5 days before); on-time parcels, which produce two
 thirds of all low reviews, are reviewed a median 2.1 days after delivery
 (delivered, reviewed orders of the analysis window). On the slides' ten-a-day
-list, 57 of every 100 customers contacted went on to rate 1–2 stars: 26 whose
+list, 57 of every 100 customers listed went on to rate 1–2 stars: 26 whose
 order never arrived, 22 who had already written while waiting for a late parcel,
 and about 9 a delivery-day call could still reach. Customers let down by a late
 or missing parcel are reached when their promised day ends instead
@@ -304,7 +305,7 @@ prints it with a correction wherever a slide's number or wording was wrong.
 
 1. **Cross-validation inside a drifting training period reorders the
    candidates**, and its fold-to-fold spread is wider than the gaps between
-   them. The 2017 folds run 12–17 day lead times against 8.3 in the test window.
+   them. The CV folds run 11.5–16.5 day lead times against 8.3 in the test window.
    Selection therefore votes on *rank* across the three most recent
    out-of-sample windows.
 2. **A two-month validation period is not enough either**: May 2018 is 8.2%
@@ -357,8 +358,8 @@ figure referenced and the selected hyperparameters printed (Appendix D), and the
 outreach-benefit assumption stated as a limitation with a sized pilot. After the
 presentation of 5 November 2026 (Appendix I, Table 22, and Appendix P): the
 report now starts from the customer, with one customer's order opening Section 1
-(Box 1), each problem stated as that customer's question, and what changes for
-customers counted from the data (Table 9) before any reais; the figures behind
+(Box 1), each problem stated with what that customer needs, and the customers
+each step reaches counted from the data (Table 9) before any reais; the figures behind
 each recommendation are labelled observed, assumed or derived
 (Table 8); every number on the unchanged slides is sourced in Appendix P; and
 the pilot is sized on the customers each contact can still reach.
