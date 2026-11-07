@@ -422,7 +422,7 @@ def fig_capacity() -> str:
     ax2.axhline(be1, color=M, ls="--", lw=1.0)
     ax2.text(cap1["k_pct"].max(), be1 + 0.02, f"break-even for expediting {be1:.2f}",
              ha="right", fontsize=6.5, color=M)
-    ax2.set_xlabel("capacity K, % of orders at checkout")
+    ax2.set_xlabel("capacity K, % of delivered orders")
     ax2.set_ylim(0, 1.02)
     ax2.set_title("(b) Late flag: derived against direct", loc="left")
     ax2.legend(loc="upper left", fontsize=6.3)
@@ -545,6 +545,7 @@ def fig_cv_folds() -> str:
                         rotation=20, ha="right")
     ax1.set_ylabel("PR-AUC (out-of-sample)")
     ax1.set_title("(a) Every candidate on every window", loc="left")
+    ax1.set_ylim(bottom=0.16)
     ax1.legend(fontsize=6.2, loc="lower center", ncol=2)
 
     y = np.arange(len(d))

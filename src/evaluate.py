@@ -384,8 +384,9 @@ def rank_select(window_scores: dict[str, list[float]],
     months and those two have opposite character - an 8.2% late rate in May 2018
     against 1.4% in June, the lowest in the series - so a criterion computed on
     it alone is noisy enough to reorder candidates. But averaging over all six
-    would hand the 2017 folds five sixths of the vote on a question about
-    mid-2018, and lead time there runs 12-17 days against 8.3 in the test window.
+    would hand the CV folds (June 2017 to April 2018) five sixths of the vote on
+    a question about mid-2018, and lead time there runs 11.5-16.5 days against
+    8.3 in the test window.
     `recent` (default `config.SELECTION_WINDOWS`) votes on the last few windows
     only; every window is still scored and returned, so the full picture is
     visible in `selection_*.csv`.

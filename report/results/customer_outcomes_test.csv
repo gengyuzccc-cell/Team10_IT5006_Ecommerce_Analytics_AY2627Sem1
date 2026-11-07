@@ -22,7 +22,7 @@ top10,on the slides' daily top-ten list (grouped by purchase day),614,placed,129
 top10_hit,  ... and rated the order 1-2 stars,351,placed,12927,27.152471571130192,24.48811015826358,30.09777747082096
 top10_hit_promise_reachable,  ... of whom not yet rated when the promised day ended (no parcel then),271,placed,12927,20.96387406204069,18.632810240217026,23.57955935374715
 top10_hit_delivery_only,  ... of whom reachable only by a call at delivery,48,placed,12927,3.7131585054537015,2.8019457526524936,4.919242318413668
-prewarn_flagged,warned at checkout (late risk at or above the 11% line),5647,delivered,12630,447.1100554235946,438.4563649002757,455.79590948874375
+prewarn_flagged,flagged at checkout (late risk at or above the 11% line),5647,delivered,12630,447.1100554235946,438.4563649002757,455.79590948874375
 prewarn_late_flagged,  ... parcel then late,773,delivered,12630,61.20348376880443,57.15498846109061,65.51882091607438
-prewarn_late_missed,"late parcel, not warned",163,delivered,12630,12.90577988915281,11.08020035427209,15.027572162566441
-prewarn_ontime_flagged,"warned, parcel then on time",4874,delivered,12630,385.9065716547902,377.45254087252874,394.4299851672574
+prewarn_late_missed,"late parcel, not flagged",163,delivered,12630,12.90577988915281,11.08020035427209,15.027572162566441
+prewarn_ontime_flagged,"flagged, parcel then on time",4874,delivered,12630,385.9065716547902,377.45254087252874,394.4299851672574

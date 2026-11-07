@@ -56,8 +56,8 @@ pilot sizes (Table~\ref{tab:pilot-arms}), the order of Box~1 and the per-order
 journeys the application shows. The deployed lead-time model is re-scored, not
 refitted, and its scores are asserted equal to the saved predictions \\[3pt]
 \code{python src/slide\_provenance.py} & Every number on the presentation slides
-recomputed from these tables, with its kind and source
-(Appendix~\ref{app:provenance}); it stops if any no longer matches its slide \\[3pt]
+with its kind and source; the 88 that can be checked are recomputed from these
+tables (Appendix~\ref{app:provenance}), and it stops if any no longer matches its slide \\[3pt]
 \code{python src/figures\_phase2.py} & Draws every modelling figure as vector
 PDF into \code{report/figures/} from those tables; the exploratory figures are
 drawn by notebooks 01--04 \\[3pt]
@@ -774,10 +774,13 @@ Customer journey tab, Figure~\ref{fig:app-journey}) \\[2pt]
 They are of four kinds the slide did not separate: observed on the held-out
 window (57.2\%, the 35 in 100); assumed, with no data source (R\$5 a contact,
 R\$40 a 1--2 star rating: Olist publishes no costs); derived by arithmetic on
-the two (R\$433 to R\$1{,}466, 44.7\%, about 1 in 5, +R\$0.72); and planned, for
+the two (R\$433 to R\$1{,}466, 44.7\%, about 1 in 5, +R\$0.72; R\$1{,}466 is
+$1{,}000 \times (712 \times 40 - 1{,}927 \times 5)/12{,}855$, R\$40 for each of the
+712 listed customers who went on to rate 1--2 stars less R\$5 for each of the
+1{,}927 contacts); and planned, for
 a pilot not yet run (the one-in-four effect, 42.9\%, 80\% power, 191 per arm,
-six weeks). Appendix~\ref{app:provenance} sources every number on every slide,
-recomputed by \code{src/slide\_provenance.py}: the values are per 1{,}000
+six weeks). Appendix~\ref{app:provenance} sources every slide number
+(\code{src/slide\_provenance.py} recomputes 88 of them): the values are per 1{,}000
 \emph{reviewed} orders; R\$775 belongs to the threshold-0.11 list, not to the
 35-in-100 share, which is worth R\$433; 57.2\% is a historical rate, not a
 control group; and the slide's statement about calls becomes ``the tables record
@@ -1115,7 +1118,7 @@ R\$433; both figures still count every contact as turning its customer around,
 and both include orders that never arrived (below). Capacity changes how the
 optimum is used rather than where it is: a team that can work only 5\% of
 reviewed orders still captures R\$1{,}107 of those R\$1{,}466 per 1{,}000
-(Table~\ref{tab:capacity}), because the top of the list is where the precision
+(Table~\ref{tab:capacity}; \code{capacity\_p2.csv}), because the top of the list is where the precision
 is.
 \textbf{The action for a late parcel belongs on the promised date, not at
 delivery.} Customer care can reach the customer when the promised day ends
@@ -1142,8 +1145,8 @@ call at delivery, 398 only by the promised-date message, 42 by either and 33 by
 neither (\code{customer\_outcomes\_test.csv}). Table~\ref{tab:reach} splits each
 list's hits the same way. Most of the slides' hits are customers no call at
 delivery could help. The list a team would actually work --- each morning, the
-previous day's deliveries whose customer has not yet rated the order --- reaches
-26 in 100, 3.2 times its 8.1\% base rate, every one of them still reachable, and
+previous day's deliveries whose customer had not rated the order when it came ---
+reaches 26 in 100, 3.2 times its 8.1\% base rate, and
 the promised-date message reaches 55 in 100 with no model at all.
 
 \begin{table}[htbp]
@@ -1225,6 +1228,8 @@ Sections~\ref{sec:data}, \ref{sec:eda}, \ref{sec:results-reg},
 
 All three members reviewed every section of the report as first submitted and
 verified the reported numbers against \code{report/stats\_phase3.txt} and
-\code{report/stats.txt}; the numbers the revision adds are checked by the
-assertions in the scripts that write them and by the test suite
+\code{report/stats.txt}; the revision's main tables (the customer counts, the
+contact lists and their values, the pilot arms, the order of Box~1 and the
+sources of the slide numbers) are tied to each other and to the earlier results
+by the assertions in the scripts that write them and by the test suite
 (Appendix~\ref{app:repro}).

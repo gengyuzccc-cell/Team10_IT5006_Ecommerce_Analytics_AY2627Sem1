@@ -1,7 +1,7 @@
 """
 Regenerate every number quoted in the Phase 1 report.
 
-The report is written by hand, but no figure in it is typed from memory: this
+The report text is not generated, but no figure in it is typed from memory: this
 script recomputes each one and writes report/stats.txt. Before submitting, run
 
     python src/report_stats.py

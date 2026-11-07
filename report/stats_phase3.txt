@@ -2573,9 +2573,9 @@ prov_slides                                          13
 prov_checked_rows                                    88
 prov_all_match                                       True
 prov_assumed_rows                                    7
-prov_kind_observed                                   66
+prov_kind_observed                                   65
 prov_kind_assumed                                    7
-prov_kind_derived                                    14
+prov_kind_derived                                    15
 prov_kind_planned                                    6
 prov_kind_literature                                 1
 prov_kind_no_data_source                             4

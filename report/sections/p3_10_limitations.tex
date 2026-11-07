@@ -57,13 +57,13 @@ Two problems, at two moments of the customer's order, from one dataset and one
 feature pipeline, carried through to a deployed application. The regression
 reaches MAE 3.90 days, 60\% below the platform's own promise; quoted with a margin
 chosen on validation, its date would have been broken for 2.5\% of delivered
-orders instead of 7.4\%; and thresholded against the promise it makes a better
+orders instead of 7.4\% (3.2\% at the platform's own average wait); and thresholded against the promise it makes a better
 late-order flag (2.89$\times$ the floor) than any classifier trained on the label
 (1.24$\times$), so the brief's dual framing is the better design. The
 low-review model reaches 3.75$\times$ its floor, and at its own moment its
 daily top ten reach 26 future 1--2 star reviewers in 100. The timing of the
 review decided more than the choice of model: most customers let down by a late
-or missing parcel had, like the customer of Box~1, rated the order before it came, so they are reached on the
+or missing parcel had, like the customer of Box~1, rated the order before it came, so they can be reached on the
 promised date without a model, and the model's list serves the customers whose
 parcel arrived but disappointed.
 

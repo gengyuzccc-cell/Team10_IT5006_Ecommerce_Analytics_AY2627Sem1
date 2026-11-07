@@ -5,8 +5,8 @@
 
 The Phase 1 report shipped with src/report_stats.py, which recomputed all 170 of
 its numeric claims so the manuscript could be diffed against the code. This is
-the same contract for Phase 2. The manuscript is written by hand; not one figure
-in it is typed from memory.
+the same contract for Phase 2. The manuscript text is not generated; not one
+figure in it is typed from memory.
 
 Anything this script cannot produce is not allowed into the report.
 """

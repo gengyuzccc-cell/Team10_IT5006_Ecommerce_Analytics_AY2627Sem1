@@ -962,10 +962,10 @@ def outcomes_test(t: pd.DataFrame, r: pd.DataFrame, b1: pd.DataFrame, top10: pd.
     flag = b1["p_late_derived"] >= thr_prewarn
     late = b1["actual_late"] == 1
     for key, label, mask in [
-            ("prewarn_flagged", "warned at checkout (late risk at or above the 11% line)", flag),
+            ("prewarn_flagged", "flagged at checkout (late risk at or above the 11% line)", flag),
             ("prewarn_late_flagged", "  ... parcel then late", flag & late),
-            ("prewarn_late_missed", "late parcel, not warned", ~flag & late),
-            ("prewarn_ontime_flagged", "warned, parcel then on time", flag & ~late)]:
+            ("prewarn_late_missed", "late parcel, not flagged", ~flag & late),
+            ("prewarn_ontime_flagged", "flagged, parcel then on time", flag & ~late)]:
         k = int(mask.sum())
         lo, hi = wilson(k, nd)
         rows.append({"key": key, "outcome": label, "orders": k, "denominator": "delivered", "denominator_n": nd,
@@ -1118,7 +1118,7 @@ def story_tables(j: pd.DataFrame, r: pd.DataFrame, top10: pd.Series, b_r1: float
 def main(out_dir: Path = RESULTS, labels_file: Path = LABELS_FILE) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     if not labels_file.exists():
-        raise SystemExit(f"{labels_file} is missing: it is the committed hand reading of the topic patterns.")
+        raise SystemExit(f"{labels_file} is missing: it holds the 175 committed verdicts behind the topic precision check (labelled by the AI assistant; report Appendix Q).")
     tables = load_all()
     orders = build_orders(tables)
     window = orders[orders["order_purchase_timestamp"].between(config.ANALYSIS_START, config.ANALYSIS_END)]

@@ -165,7 +165,7 @@ Zhu Gengyu  & A0333773Y \\
 % ============================== AI DECLARATION =============================
 \clearpage
 \section*{AI Tool Declaration}
-\addcontentsline{toc}{section}{AI Tool Declaration}
+\phantomsection\addcontentsline{toc}{section}{AI Tool Declaration}
 
 We used two AI assistants during this project, under the course's
 academic-integrity rules, and declare their use here.
@@ -175,8 +175,8 @@ as a programming and writing assistant working under our direction: it drafted
 and refactored Python code in \code{src/}, \code{deployment/} and \code{tests/}
 from our specifications; helped locate and fix bugs in the data pipeline, the
 training scripts and the Streamlit application; ran the regeneration scripts
-whose outputs (\code{report/results/}, \code{report/stats\_phase3.txt}) are the
-source of every number quoted here; typeset this report in \LaTeX{} and helped
+whose outputs (\code{report/results/}, \code{report/stats.txt},
+\code{report/stats\_phase3.txt}) are the source of the numbers quoted here; typeset this report in \LaTeX{} and helped
 build the slide deck from our outlines, results and the evaluators' feedback;
 and cross-checked the manuscript and the slides against the result tables
 before submission.
@@ -187,16 +187,19 @@ expression and to refine our writing.
 \textbf{The revision after the presentation of 5 November 2026} used Claude
 Code in the same role, at the team's direction: it proposed and drafted the
 changes made in response to the feedback --- the revised sections and
-appendices of this report and two new analysis scripts,
+appendices of this report, the application's new Customer journey tab and the
+changes to its other tabs, and two new analysis scripts,
 \code{src/customer\_view.py} and \code{src/slide\_provenance.py} --- and it
 labelled the 175 held-out comments behind the complaint-topic precision check
 (\code{customer\_topic\_labels.csv}, Appendix~\ref{app:customer}). Every number
-the revision adds is read from a script output in \code{report/results/} or
-\code{report/stats\_phase3.txt}; assertions in the new scripts require the earlier
+the revision adds is read from a script output in \code{report/results/},
+\code{report/stats\_phase3.txt} or \code{report/stats.txt}, or recomputed from
+the Olist tables; assertions in the new scripts require the earlier
 results (the deployed models' test predictions, and the lists and values shown
 on the slides) to be reproduced exactly, and
-\code{src/slide\_provenance.py} checks every number on the slides against its
-source (Appendix~\ref{app:provenance}). The revision adds no reference.
+\code{src/slide\_provenance.py} recomputes the 88 rows of the slide-provenance
+table that carry a checkable number and stops if one no longer matches its slide
+(Appendix~\ref{app:provenance}). The revision adds no reference.
 
 The choice of problems, the analysis design (the prediction moments, the
 leakage regimes, the chronological split, the pre-registered success criteria

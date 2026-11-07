@@ -72,8 +72,8 @@ of item value), and 51.4\% of orders are paid in instalments
 
 Review scores are severely imbalanced --- \textbf{77.1\%} are four or five stars
 --- exactly the imbalance the brief warns about; the interesting structure is
-what produces the minority. A late delivery raises the probability of a 1--2
-star review from \textbf{9.2\%} to \textbf{54.0\%}, a \textbf{5.9-fold} increase,
+what produces the minority. Late parcels are rated 1--2 stars \textbf{54.0\%}
+of the time against \textbf{9.2\%} on time, \textbf{5.9} times as often,
 monotone in how late the parcel is (Figure~\ref{fig:reviews}). This is the
 clearest relationship in the dataset, and it reproduces at order level the
 logistics--rating link \citet{deshpande2023logistics} establish across 15
@@ -81,8 +81,8 @@ million orders. It also has a methodological consequence: a model predicting the
 review \emph{at checkout} cannot see the variable that matters most.
 
 \textbf{What unhappy customers wrote.} Three in four 1--2 star reviews carry a
-comment. Read with a keyword dictionary checked on a held-out sample
-(80--96\% precision by topic; Appendix~\ref{app:customer}), they describe two
+comment. Read with a keyword dictionary checked by an AI assistant on a held-out
+sample (80--96\% precision by topic; Appendix~\ref{app:customer}), they describe two
 failures. Customers whose parcel was late or never came write that they do not
 have it (60\% and 58\% of comments), and those whose order never came write
 about refunds (25\%). Customers whose parcel came on time write about what was
@@ -93,7 +93,7 @@ rating, so they are read here and never used as a feature.
 \subsection{From candidates to the two problems}
 \label{sec:candidates}
 
-Three candidates were probed on the chronological, customer-grouped split with
+Three candidates were probed on the chronological split with
 untuned pipelines (Figure~\ref{fig:candidates}; Table~\ref{tab:checklist} in
 Appendix~\ref{app:dictionary}). \emph{Delivery performance framed twice} became
 Problem 1: the regression reached MAE 3.89 days against 6.65 for a constant,

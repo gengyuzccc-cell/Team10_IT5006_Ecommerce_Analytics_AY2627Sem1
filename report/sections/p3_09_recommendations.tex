@@ -16,60 +16,6 @@ of failure}: no feature costs more than 0.034 days of MAE, because permutation
 understates correlated predictors such as the promise, the route histories and
 the distance.
 
-\subsection{From a probability to a decision: what is observed, what is assumed}
-\label{sec:cost}
-
-Olist publishes no costs, so every reais figure below rests on
-\emph{assumed} ones (\code{config.COSTS}): R\$5 for a contact, and R\$40 for a
-1--2 star rating a contact turns around --- a stand-in for the damage low ratings
-do to seller sales on another marketplace \citep{deshpande2023logistics}, not a
-measured cost. Nor can the customer's own return price it: 98\% of first-time
-buyers order nothing within 180 days of delivery (Appendix~\ref{app:customer}). What is \emph{observed} is how many customers a
-contact reaches and the share who go on to rate 1--2 stars, its precision; the
-share a contact turns around is unknown until the pilot measures it. A contact
-pays when precision times that share exceeds $5/40 = 0.125$
-\citep{elkan2001cost}, so Table~\ref{tab:cost} \emph{derives} the share each
-contact must turn around.
-
-\begin{table}[htbp]
-\centering
-\caption{The decision layer. Reach (per 1{,}000 reviewed test orders) and
-precision are observed on the held-out window; the share a contact must turn
-around is derived from the two assumed costs as $0.125/\text{precision}$.
-Appendix~\ref{app:provenance} sources every figure on the slides.}
-\label{tab:cost}
-\footnotesize
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}lrrrl@{}}
-\toprule
-\textbf{Action} & \textbf{reach} & \textbf{precision} &
-\textbf{must turn around} & \textbf{verdict} \\
- & \emph{observed} & \emph{observed} & \emph{derived} & \\
-\midrule
-Promised-date message (no model)   & 62.5 & 0.547 & 22.8\% (1 in 4.4) & pilot \\
-Delivery-day call, ten a day       & 42.5 & 0.260 & 48.1\% (1 in 2.1) & pilot \\
-Expedite on the late flag (R\$12 : R\$40) & --- & $\le$ 0.27 & needs precision 0.30 & do not \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-If every contact turned its customer around, the promised-date message would be
-worth R\$1{,}056 per 1{,}000 reviewed orders and the delivery-day call R\$229; if
-one in four did, R\$30 and $-$R\$102 (Appendix~\ref{app:customer} varies the
-costs and the effect). The slides' R\$775--1{,}466 values the review-risk list over
-all reviewed orders at a threshold, 0.11, read off the test window
-(Figure~\ref{fig:threshold}), with every contact assumed to work: R\$1{,}466
-counts every listed customer who went on to rate 1--2 stars, R\$775 leaves out those
-who rated a late parcel before it arrived. The ten-a-day list's 35-in-100
-share of the rest is worth R\$433, and three fifths of the threshold
-list's gross value comes from customers whose order never came or who rated a
-late parcel before it arrived --- the promised-date message's customers
-(Appendix~\ref{app:provenance}).
-\textbf{The late flag does not pay for an expensive action}: expediting at an assumed R\$12
-needs precision 0.300, a conservative bar (Appendix~\ref{app:provenance}), and
-the flag peaks at \textbf{0.274} --- informative (ROC-AUC 0.782), but only for
-near-free actions: a better date, an early word.
-
 \subsection{Recommendations along the customer's order}
 \label{sec:stakeholders}
 
@@ -115,7 +61,63 @@ drift (Section~\ref{sec:results-segments}); a week in which transit lengthens
 while the promise does not is the February--March 2018 pattern again
 (Appendix~\ref{app:lateness}).
 
-\subsection{Measuring what the business case assumes: a pilot for each contact}
+\subsection{From a probability to a decision: what is observed, what is assumed}
+\label{sec:cost}
+
+Olist publishes no costs, so every reais figure below rests on
+\emph{assumed} ones (\code{config.COSTS}): R\$5 for a contact, and R\$40 for a
+1--2 star rating a contact turns around --- a stand-in for the damage low ratings
+do to seller sales on another marketplace \citep{deshpande2023logistics}, not a
+measured cost. Nor can repeat purchases price it: 98\% of first-time
+buyers order nothing within 180 days of delivery (Appendix~\ref{app:customer}). What is \emph{observed} is how many customers a
+contact reaches and the share who go on to rate 1--2 stars, its precision; the
+share a contact turns around is unknown until the pilot measures it. A contact
+pays when precision times that share exceeds $5/40 = 0.125$
+\citep{elkan2001cost}, so Table~\ref{tab:cost} \emph{derives} the share each
+contact must turn around.
+
+\begin{table}[htbp]
+\centering
+\caption{The decision layer. Reach (per 1{,}000 reviewed test orders) and
+precision are observed on the held-out window; the share a contact must turn
+around is derived from the two assumed costs as $0.125/\text{precision}$; a value
+is R\$40 for each customer turned around less R\$5 for each contact, per 1{,}000
+reviewed orders. Appendix~\ref{app:provenance} sources every figure on the slides.}
+\label{tab:cost}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrl@{}}
+\toprule
+\textbf{Action} & \textbf{reach} & \textbf{precision} &
+\textbf{must turn around} & \textbf{verdict} \\
+ & \emph{observed} & \emph{observed} & \emph{derived} & \\
+\midrule
+Promised-date message (no model)   & 62.5 & 0.547 & 22.8\% (1 in 4.4) & pilot \\
+Delivery-day call, ten a day       & 42.5 & 0.260 & 48.1\% (1 in 2.1) & pilot \\
+Expedite on the late flag (R\$12 : R\$40) & --- & $\le$ 0.27 & needs precision 0.30 & do not \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+If every contact turned its customer around, the promised-date message would be
+worth R\$1{,}056 per 1{,}000 reviewed orders and the delivery-day call R\$229; if
+one in four did, R\$30 and $-$R\$102 (Appendix~\ref{app:customer} varies the
+costs and the effect). Slide 11's R\$775--1{,}466 values the review-risk list over
+all reviewed orders at a threshold, 0.11, read off the test window
+(Figure~\ref{fig:threshold}), with every contact assumed to work: R\$1{,}466
+counts every listed customer who went on to rate 1--2 stars, R\$775 leaves out those
+who rated a late parcel before it arrived. On the slide's ten-a-day list, ranked
+by purchase day, the 35-in-100 share of the rest is worth R\$433, and three
+fifths of the threshold
+list's gross value comes from customers whose order never came or who rated a
+late parcel before it arrived --- the promised-date message's customers
+(Appendix~\ref{app:provenance}).
+\textbf{The late flag does not pay for an expensive action}: expediting at an assumed R\$12
+needs precision 0.300, a conservative bar (Appendix~\ref{app:provenance}), and
+the flag peaks at \textbf{0.274} --- informative (ROC-AUC 0.782), but only for
+near-free actions: a better date, an early word.
+
+\subsection{A pilot for each contact: whether it helps the customer}
 \label{sec:pilot}
 
 Every reais figure above rests on an effect the data cannot show, because the
@@ -135,11 +137,12 @@ around about one in two; detecting that needs 159 per arm, about five weeks at
 ten listed a day. \emph{Outcomes, customer first:} the final 1--2 star rate per
 randomised order (not the pre-arrival rate, which holding the survey removes by
 construction), the share who review, complaints and refund requests, and
-complaints about the contact; then reais per contact. Appendix~\ref{app:pilot}
-compares the design on slide 11 (Table~\ref{tab:pilot},
-Figure~\ref{fig:pilot}).
+complaints about the contact; then reais per contact. Slide 11's design (191 per
+arm, six weeks) randomises the purchase-day list, on which a call can change at
+most 8.8 points, below the 12.5-point break-even (Appendix~\ref{app:pilot},
+Table~\ref{tab:pilot}, Figure~\ref{fig:pilot}).
 
-\subsection{Impact: what changes for customers, and in reais}
+\subsection{Impact: customer outcomes first, reais second}
 
 \begin{table}[htbp]
 \centering
@@ -166,9 +169,10 @@ Each group names its population; no row assumes a cost or an effect of contact.}
 \end{tabular}
 \end{table}
 
-No row assumes a cost or an effect of contact: of the 1{,}418 customers who rated 1--2 stars,
+Of the 1{,}418 customers who rated 1--2 stars,
 two in three could still be reached at delivery and almost all the rest when
-their promised day ended. The reais of Section~\ref{sec:cost} follow only if the
+their promised day ended; the promised-date message reaches all 440 it can, the
+ten-a-day delivery-day list 142 of the 987 it could. The reais of Section~\ref{sec:cost} follow only if the
 pilot finds the effect. What it would take is modest: the three artifacts and a
 daily scoring job, which the application already runs on a held-out day; a
 calendar rule; a monthly refit; and the pilot.

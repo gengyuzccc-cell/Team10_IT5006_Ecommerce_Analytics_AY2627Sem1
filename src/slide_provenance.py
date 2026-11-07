@@ -354,8 +354,8 @@ def build_rows(X: SimpleNamespace, D: SimpleNamespace) -> list[Row]:
             correction="the slide's statement about calls has no source: the tables record no contact other than the "
                        "survey, so only a randomised pilot can measure what a contact changes"))
     add(Row(11, "PLUS ARM B (PROMISED-DATE OVERDUE ORDERS)", "planned", "customer_pilot_arms.csv",
-            correction=f"{D.msg['contacts_per_day']:.1f} customers a day not yet rated when the promised day ends, "
-                       f"{100 * D.msg['precision']:.1f}% then rate 1–2★: {int(D.arm_b2['n_per_arm_80'])} per arm, "
+            correction=f"{D.msg['contacts_per_day']:.1f} customers a day rate the order only after the promised day "
+                       f"ends without a parcel, {100 * D.msg['precision']:.1f}% of them 1–2★: {int(D.arm_b2['n_per_arm_80'])} per arm, "
                        f"{int(D.arm_b2['weeks_80'])} weeks (two arms) or {int(D.arm_b3['weeks_80'])} (three); "
                        f"outcome: the final rating"))
     add(Row(11, "LIVE VALIDATION … Historical data proves", "wording", "none",

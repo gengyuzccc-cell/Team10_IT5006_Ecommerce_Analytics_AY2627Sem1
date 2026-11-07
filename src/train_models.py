@@ -250,7 +250,7 @@ def main(n_iter: int, smoke: bool = False) -> None:
     # The brief's Example 4 asks for the same underlying problem framed twice.
     # Rather than train a second model, take the regression's own answer and
     # compare it with the date the customer was promised. The margin is
-    # mapped to a probability by a single-parameter logistic fitted on the
+    # mapped to a probability by a one-feature logistic (slope and intercept) fitted on the
     # VALIDATION period, so the output is a calibrated risk the app can show
     # and the cost curve can use - not an uncalibrated score.
     # The validation frame for the late target, aligned with the regression's

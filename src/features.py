@@ -21,10 +21,10 @@ placed**. That single decision determines what is admissible:
 `assert_no_leakage()` is the gate every modelling cell must pass, checked
 against `config.POST_OUTCOME_FORBIDDEN`.
 
-The split in `make_splits()` is chronological *and* grouped on
-`customer_unique_id`. The brief warns that `customer_id` is regenerated per
-order and is therefore not a person; splitting on rows would let the same buyer
-appear on both sides.
+The split in `make_splits()` is chronological. It also returns
+`test_unseen_customers`: the test window without the buyers who have orders on
+both sides of the cut, identified by `customer_unique_id`. The brief warns that
+`customer_id` is regenerated per order and is therefore not a person.
 """
 from __future__ import annotations
 

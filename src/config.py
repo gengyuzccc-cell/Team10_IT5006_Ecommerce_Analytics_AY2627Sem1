@@ -170,11 +170,11 @@ SEARCH_ITER = 30           # RandomizedSearchCV draws per model
 
 # How many of the out-of-sample windows the selection rule votes on, counting
 # back from deployment. There are six in total - five expanding CV folds plus the
-# validation period - and using all of them would give 2017 five sixths of the
-# vote on a question about mid-2018.
+# validation period - and using all of them would give the older windows five
+# sixths of the vote on a question about mid-2018.
 #
-# The monthly series is what fixes the number. Mean lead time runs 12-17 days
-# across the 2017 folds, 8-12 days from February 2018, and 8.3 days in the test
+# The monthly series is what fixes the number. Mean lead time runs 11.5-16.5
+# days across the CV folds (June 2017 to April 2018) and 8.3 days in the test
 # window; performance in early 2017 is simply not evidence about performance
 # after the platform doubled its fulfilment speed. Three windows covers roughly
 # February to June 2018 - about 32,000 orders - which is recent enough to
